@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CT Pre-D Task Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Poppins',sans-serif;background:#f0f4f8;color:#1a1a2e}
+.header{background:linear-gradient(135deg,#023E8A,#0077B6);padding:20px 30px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 15px rgba(0,0,0,.15)}
+.header img{height:50px}
+.header h1{color:#fff;font-size:28px;font-weight:600}
+.header-right{display:flex;align-items:center;gap:15px}
+.stats-bar{display:flex;gap:15px;padding:20px 30px;flex-wrap:wrap}
+.stat-card{flex:1;min-width:160px;background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08);text-align:center}
+.stat-card .label{font-size:13px;color:#666;font-weight:500}
+.stat-card .value{font-size:32px;font-weight:700;margin-top:4px}
+.stat-card.total .value{color:#023E8A}
+.stat-card.submitted .value{color:#00D2A0}
+.stat-card.pending .value{color:#FF9F43}
+.stat-card.completed .value{color:#00B4D8}
+.stat-card.waiting .value{color:#A855F7}
+.stat-card.needinfo .value{color:#FF6B6B}
+.stat-card.overdue .value{color:#FF6B6B}
+.days-badge{display:inline-block;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;min-width:40px}
+.days-ok{background:#d1fae5;color:#065f46}
+.days-warn{background:#fef3c7;color:#92400e}
+.days-overdue{background:#fee2e2;color:#991b1b}
+.days-critical{background:#991b1b;color:#fff}
+tr.row-warn{border-left:4px solid #FF9F43}
+tr.row-overdue{border-left:4px solid #FF6B6B;background:#fff5f5}
+tr.row-overdue:hover{background:#fee2e2}
+.controls{padding:15px 30px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.controls select,.controls input{font-family:'Poppins',sans-serif;padding:8px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:#fff;transition:border-color .2s}
+.controls select:focus,.controls input:focus{border-color:#0077B6;outline:none}
+.controls label{font-size:13px;font-weight:600;color:#555}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.btn{font-family:'Poppins',sans-serif;padding:8px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:#0077B6;color:#fff}
+.btn-primary:hover{background:#023E8A}
+.btn-export{background:#00D2A0;color:#fff}
+.btn-export:hover{background:#00b88d}
+.btn-reset{background:#FF6B6B;color:#fff}
+.btn-reset:hover{background:#e55a5a}
+.table-container{padding:0 30px 30px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:13px}
+thead th{background:#023E8A;color:#fff;padding:12px 10px;text-align:left;font-weight:600;font-size:12px;position:sticky;top:0;z-index:10;white-space:nowrap}
+tbody td{padding:10px;border-bottom:1px solid #eee;vertical-align:top}
+tbody tr:hover{background:#f0f7ff}
+tbody tr.completed-row{background:#f0fdf4}
+td.task-desc{max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+td.task-desc:hover{white-space:normal;overflow:visible}
+td.task-notes{max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+td.task-notes:hover{white-space:normal;overflow:visible}
+select.cell-dropdown{font-family:'Poppins',sans-serif;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;width:100%;background:#fff;cursor:pointer}
+select.cell-dropdown:focus{border-color:#0077B6;outline:none}
+select.cell-dropdown.val-yes{background:#d1fae5;border-color:#00D2A0}
+select.cell-dropdown.val-no{background:#fee2e2;border-color:#FF6B6B}
+select.cell-dropdown.val-waiting{background:#fef3c7;border-color:#FF9F43}
+select.cell-dropdown.val-needinfo{background:#ede9fe;border-color:#A855F7}
+select.cell-dropdown.val-resubmitted{background:#dbeafe;border-color:#0077B6}
+select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-new{background:#dbeafe;color:#1e40af}
+.badge-viewed{background:#fef3c7;color:#92400e}
+.badge-done{background:#d1fae5;color:#065f46}
+.password-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(2,62,138,.95);display:flex;align-items:center;justify-content:center;z-index:1000}
+.password-box{background:#fff;padding:40px;border-radius:16px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.password-box img{height:60px;margin-bottom:20px}
+.password-box h2{font-size:22px;color:#023E8A;margin-bottom:8px}
+.password-box p{font-size:14px;color:#666;margin-bottom:20px}
+.password-box input{font-family:'Poppins',sans-serif;padding:10px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:250px;text-align:center}
+.password-box button{margin-top:15px}
+.password-error{color:#FF6B6B;font-size:13px;margin-top:10px;display:none}
+.last-updated{font-size:12px;color:rgba(255,255,255,.7)}
+.tab-bar{display:flex;gap:0;padding:0 30px;background:#fff;border-bottom:3px solid #023E8A}
+.tab-btn{font-family:'Poppins',sans-serif;padding:12px 24px;border:none;background:transparent;font-size:14px;font-weight:600;color:#666;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-3px;transition:all .2s}
+.tab-btn:hover{color:#023E8A}
+.tab-btn.active{color:#023E8A;border-bottom-color:#023E8A;background:#f0f7ff}
+.tab-badge{background:#FF6B6B;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:4px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+/* Performance Summary */
+.perf-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;padding:12px 36px 24px}
+.p-card{background:#fff;border-radius:14px;padding:18px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.04);transition:transform .2s}
+.p-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+.p-card .p-val{font-size:28px;font-weight:800;margin:4px 0}
+.p-card .p-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+/* Team Cards */
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:0 36px 24px}
+.t-card{background:#fff;border-radius:14px;padding:20px;position:relative;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.04);transition:transform .2s}
+.t-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+.t-card-accent{position:absolute;top:0;left:0;right:0;height:4px}
+.t-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.t-card-name{font-size:18px;font-weight:700;color:#023E8A}
+.t-card-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.t-stat{text-align:center;padding:8px 4px;background:#f8fafc;border-radius:8px}
+.t-stat-val{font-size:18px;font-weight:800;line-height:1.2}
+.t-stat-label{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.3px;font-weight:600}
+.t-card-meta{font-size:11px;color:#64748b;line-height:1.6}
+.t-card-meta b{color:#334155}
+.t-progress{margin-top:10px}
+.t-progress-track{height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden}
+.t-progress-fill{height:100%;border-radius:3px;transition:width .5s}
+/* Leaderboard */
+.lb-wrapper{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.04)}
+.lb-row{display:grid;grid-template-columns:50px 1fr 80px 1fr 80px;align-items:center;padding:14px 20px;gap:14px;border-bottom:1px solid #f1f5f9;transition:background .2s}
+.lb-row:hover{background:#f8fafc}
+.lb-row.lb-header{background:linear-gradient(135deg,#023E8A,#0077B6);color:#fff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:12px 20px}
+.lb-row.lb-header:hover{background:linear-gradient(135deg,#023E8A,#0077B6)}
+.lb-rank{text-align:center;font-size:20px;font-weight:800;color:#94a3b8}
+.lb-medal{font-size:28px}
+.lb-name{font-size:16px;font-weight:700;color:#023E8A}
+.lb-name-sub{font-size:11px;color:#94a3b8}
+.lb-bar-track{height:24px;background:#f1f5f9;border-radius:12px;overflow:hidden}
+.lb-bar-fill{height:100%;border-radius:12px;display:flex;align-items:center;padding:0 10px;justify-content:flex-end;min-width:40px}
+.lb-bar-fill span{font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
+.lb-stat-val{font-size:16px;font-weight:700}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700;color:#fff}
+/* Overview Charts */
+.ov-chart-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.04)}
+.ov-chart-card h3{font-size:16px;font-weight:700;color:#023E8A;margin-bottom:16px}
+.ov-bar-row{display:flex;align-items:center;margin-bottom:10px;gap:10px}
+.ov-bar-label{width:140px;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;color:#334155;font-weight:600}
+.ov-bar-track{flex:1;height:28px;background:#f1f5f9;border-radius:14px;overflow:hidden;position:relative}
+.ov-bar-fill{height:100%;border-radius:14px;display:flex;align-items:center;padding:0 12px;justify-content:flex-end;min-width:40px;transition:width .6s}
+.ov-bar-fill span{font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
+.ov-bar-value{font-size:13px;font-weight:800;width:50px;text-align:right;flex-shrink:0;color:#334155}
+.ov-donut-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.ov-donut{position:relative;width:280px;height:280px;flex-shrink:0}
+.ov-donut svg{transform:rotate(-90deg)}
+.ov-donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.ov-donut-center .big{font-size:42px;font-weight:800;color:#023E8A}
+.ov-donut-center .small{font-size:11px;color:#64748b}
+.ov-legend{display:flex;flex-direction:column;gap:8px}
+.ov-legend-item{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600}
+.ov-legend-dot{width:14px;height:14px;border-radius:4px;flex-shrink:0}
+.ov-trend-row{display:flex;align-items:flex-end;gap:6px;height:180px;padding:10px 0}
+.ov-trend-bar{flex:1;border-radius:6px 6px 0 0;min-width:20px;position:relative;transition:height .4s;cursor:pointer}
+.ov-trend-bar:hover{opacity:.85}
+.ov-trend-bar .ov-trend-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:#334155;white-space:nowrap}
+.ov-trend-labels{display:flex;gap:6px;padding-top:6px}
+.ov-trend-labels span{flex:1;text-align:center;font-size:10px;color:#64748b;font-weight:600}
+</style>
+</head>
+<body>
+<div class="password-overlay" id="passwordOverlay">
+<div class="password-box">
+<img src="https://abrahealthgroup.com/wp-content/uploads/2022/09/Asset-48@4x-copy.png" alt="Abra Health">
+<h2>CT Pre-D Dashboard</h2>
+<p>Enter password to access</p>
+<input type="password" id="passwordInput" placeholder="Password" onkeypress="if(event.key==='Enter')checkPassword()">
+<br><button class="btn btn-primary" onclick="checkPassword()">Enter</button>
+<div class="password-error" id="passwordError">Incorrect password</div>
+</div></div>
+
+<div id="mainDashboard" style="display:none">
+<div class="header">
+<div style="display:flex;align-items:center;gap:15px">
+<img src="https://abrahealthgroup.com/wp-content/uploads/2022/09/Asset-48@4x-copy.png" alt="Abra Health">
+<div><h1>CT Pre-D Task Dashboard</h1><div class="last-updated" id="lastUpdated"></div></div>
+</div>
+<div class="header-right"><button class="btn btn-export" onclick="exportCSV()">Export CSV</button></div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+<button class="tab-btn" onclick="switchTab('overview')">Overview</button>
+<button class="tab-btn active" onclick="switchTab('tasks')">All Tasks</button>
+<button class="tab-btn" onclick="switchTab('followup')">Follow Up (10-21d) <span class="tab-badge" id="followupBadge">0</span></button>
+<button class="tab-btn" onclick="switchTab('urgent')">Urgent (21+d) <span class="tab-badge" id="urgentBadge" style="background:#991b1b">0</span></button>
+<button class="tab-btn" onclick="switchTab('completed')">Completed <span class="tab-badge" id="completedBadge" style="background:#00D2A0">0</span></button>
+<button class="tab-btn" onclick="switchTab('activity')">Staff Activity Log</button>
+</div>
+
+<div class="stats-bar">
+<div class="stat-card total"><div class="label">Total Tasks</div><div class="value" id="statTotal">0</div></div>
+<div class="stat-card submitted"><div class="label">Pre-D Submitted</div><div class="value" id="statSubmitted">0</div></div>
+<div class="stat-card pending"><div class="label">Pending</div><div class="value" id="statPending">0</div></div>
+<div class="stat-card waiting"><div class="label">Waiting Response</div><div class="value" id="statWaiting">0</div></div>
+<div class="stat-card needinfo"><div class="label">Need Info</div><div class="value" id="statNeedInfo">0</div></div>
+<div class="stat-card overdue"><div class="label">Overdue (5+ days)</div><div class="value" id="statOverdue">0</div></div>
+<div class="stat-card completed"><div class="label">Completed</div><div class="value" id="statCompleted">0</div></div>
+</div>
+
+<!-- Overview Tab -->
+<div id="tabOverview" class="tab-content">
+<div style="padding:20px 36px">
+<div style="display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px">
+<div class="filter-group"><label>From</label><input type="date" id="ovFromDate" value="2026-01-01"></div>
+<div class="filter-group"><label>To</label><input type="date" id="ovToDate" value="2026-04-29"></div>
+<div class="filter-group"><label>Pre-D Type</label>
+<select id="ovType"><option value="">All Types</option>
+<option value="CT Pre-D Ortho">Ortho</option>
+<option value="CT Pre-D Pedo/GP">Pedo/GP</option>
+<option value="CT Pre-D Endo">Endo</option>
+<option value="CT Pre-D 3MRC/Nitrous">3MRC/Nitrous</option>
+</select></div>
+<div class="filter-group"><label>Office</label>
+<select id="ovOffice"><option value="">All Offices</option></select></div>
+<button class="btn btn-primary" onclick="renderOverview()">Apply</button>
+</div>
+</div>
+
+<!-- Overview Summary Cards -->
+<div class="perf-summary" id="ovSummary"></div>
+
+<!-- Charts Row -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 36px 24px" id="ovChartsRow">
+<div class="ov-chart-card" id="ovTypeChart"></div>
+<div class="ov-chart-card" id="ovOfficeChart"></div>
+</div>
+
+<!-- Insurance & Status Charts -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 36px 24px">
+<div class="ov-chart-card" id="ovInsChart"></div>
+<div class="ov-chart-card" id="ovStatusChart"></div>
+</div>
+
+<!-- Monthly Trend -->
+<div style="padding:0 36px 24px">
+<div class="ov-chart-card" id="ovTrendChart"></div>
+</div>
+
+</div><!-- end tabOverview -->
+
+<div id="tabTasks" class="tab-content active">
+<div class="controls">
+<div class="filter-group">
+<label>Task List (Cmd+click for multiple)</label>
+<select id="filterTaskList" multiple size="5" style="min-width:180px">
+<option value="__all__" selected>All Task Lists</option>
+<option value="CT Pre-D Ortho">CT Pre-D Ortho</option>
+<option value="CT Pre-D Pedo/GP">CT Pre-D Pedo/GP</option>
+<option value="CT Pre-D Endo">CT Pre-D Endo</option>
+<option value="CT Pre-D 3MRC/Nitrous">CT Pre-D 3MRC/Nitrous</option>
+</select></div>
+<div class="filter-group"><label>Pre-D Submission</label>
+<select id="filterSubmission">
+<option value="">All</option><option value="Yes">Yes</option><option value="No">No</option>
+<option value="__notset__">Not Set</option>
+</select></div>
+<div class="filter-group"><label>Days Waiting</label>
+<select id="filterDays">
+<option value="">All</option>
+<option value="overdue">5+ Days (Needs Follow-Up)</option>
+<option value="critical">10+ Days (Critical)</option>
+</select></div>
+<div class="filter-group"><label>Task Completed</label>
+<select id="filterCompleted">
+<option value="">All</option><option value="Yes">Yes</option><option value="No">No</option>
+</select></div>
+<div class="filter-group"><label>Assigned Staff</label>
+<select id="filterStaff"><option value="">All Staff</option></select></div>
+<div class="filter-group"><label>Home Office</label>
+<select id="filterOffice"><option value="">All Offices</option></select></div>
+<div class="filter-group"><label>Search</label>
+<input type="text" id="searchInput" placeholder="Patient name, PatNum..." oninput="renderTable()"></div>
+<div class="filter-group" style="justify-content:flex-end">
+<label>&nbsp;</label><button class="btn btn-reset" onclick="resetFilters()">Reset Filters</button></div>
+</div>
+
+<div class="table-container">
+<table><thead><tr>
+<th>#</th><th>Task List</th><th>Task #</th><th>Date Created</th><th>OD Status</th>
+<th>PatNum</th><th>DOB</th><th>Home Office</th><th>Insurance</th><th>Subscriber ID</th>
+<th>Task Description</th>
+<th style="min-width:130px">Assigned Staff</th><th style="min-width:160px">Pre-D Submission</th><th>Submission Date</th>
+<th style="min-width:130px">Updated Task in OD</th><th>Days Waiting</th>
+<th style="min-width:130px">Task Completed</th><th style="min-width:200px">Remarks</th>
+</tr></thead><tbody id="taskBody"></tbody></table>
+</div>
+</div><!-- end tabTasks -->
+
+<!-- Follow Up Tab (10-21 days) -->
+<div id="tabFollowup" class="tab-content">
+<div style="padding:20px 30px">
+<h2 style="color:#FF9F43;margin-bottom:10px">Follow-Up Queue (10-21 Days)</h2>
+<p style="color:#666;font-size:14px;margin-bottom:15px">Tasks submitted 10-21 days ago without completion. Follow up with the state on these.</p>
+</div>
+<div class="table-container">
+<table><thead><tr>
+<th>#</th><th>Days</th><th>Task List</th><th>Task #</th><th>Submitted</th>
+<th>PatNum</th><th>Insurance</th><th>Task Description</th>
+<th>Assigned Staff</th><th style="min-width:200px">Follow-Up Remarks</th><th>Last Follow-Up</th><th style="min-width:130px">Task Completed</th>
+</tr></thead><tbody id="followupBody"></tbody></table>
+</div>
+</div><!-- end tabFollowup -->
+
+<!-- Urgent Tab (21+ days) -->
+<div id="tabUrgent" class="tab-content">
+<div style="padding:20px 30px">
+<h2 style="color:#991b1b;margin-bottom:10px">Urgent (21+ Days)</h2>
+<p style="color:#666;font-size:14px;margin-bottom:15px">Tasks submitted over 21 days ago. These require immediate attention and escalation.</p>
+</div>
+<div class="table-container">
+<table><thead><tr>
+<th>#</th><th>Days</th><th>Task List</th><th>Task #</th><th>Submitted</th>
+<th>PatNum</th><th>Insurance</th><th>Task Description</th>
+<th>Assigned Staff</th><th style="min-width:200px">Follow-Up Remarks</th><th>Last Follow-Up</th><th style="min-width:130px">Task Completed</th>
+</tr></thead><tbody id="urgentBody"></tbody></table>
+</div>
+</div><!-- end tabUrgent -->
+
+<!-- Completed Tab -->
+<div id="tabCompleted" class="tab-content">
+<div style="padding:20px 30px">
+<h2 style="color:#00D2A0;margin-bottom:10px">Completed Tasks</h2>
+<p style="color:#666;font-size:14px;margin-bottom:15px">Tasks marked as completed are automatically moved here.</p>
+</div>
+<div class="table-container">
+<table><thead><tr>
+<th>#</th><th>Task List</th><th>Task #</th><th>Date Created</th>
+<th>PatNum</th><th>Home Office</th><th>Insurance</th>
+<th>Task Description</th><th>Assigned Staff</th><th>Remarks</th>
+</tr></thead><tbody id="completedBody"></tbody></table>
+</div>
+</div><!-- end tabCompleted -->
+
+<!-- Staff Activity Tab -->
+<div id="tabActivity" class="tab-content">
+
+<!-- Performance Summary -->
+<div style="padding:24px 36px 8px"><h2 style="font-size:22px;font-weight:700;color:#023E8A">Performance Overview</h2></div>
+<div class="perf-summary" id="perfSummary"></div>
+
+<!-- Team Member Cards -->
+<div style="padding:24px 36px 8px"><h2 style="font-size:22px;font-weight:700;color:#023E8A">Team Members</h2>
+<p style="font-size:13px;color:#64748b;margin-top:4px">Pre-D submissions, follow-ups, and completion rates per staff member</p></div>
+<div class="team-grid" id="teamGrid"></div>
+
+<!-- Leaderboard -->
+<div style="padding:24px 36px 8px"><h2 style="font-size:22px;font-weight:700;color:#023E8A">Leaderboard</h2></div>
+<div style="padding:0 36px 24px" id="leaderboardWrap"></div>
+
+<!-- Daily Breakdown -->
+<div style="padding:24px 36px 8px;display:flex;gap:15px;align-items:center;flex-wrap:wrap">
+<h2 style="font-size:22px;font-weight:700;color:#023E8A">Daily Breakdown</h2>
+<div class="filter-group"><label>Staff</label>
+<select id="activityStaffFilter" onchange="renderDailyBreakdown()"><option value="">All Staff</option></select></div>
+<div class="filter-group"><label>Date</label>
+<select id="activityDateFilter" onchange="renderDailyBreakdown()"><option value="">All Dates</option></select></div>
+</div>
+<div class="table-container">
+<table><thead><tr>
+<th>Date</th><th>Team Member</th><th>Pre-Ds Submitted</th><th>Follow-Ups</th><th>Completed</th>
+<th>Completion %</th><th>Total Actions</th>
+</tr></thead><tbody id="dailyBody"></tbody></table>
+</div>
+
+<!-- Activity Log -->
+<div style="padding:24px 36px 8px"><h2 style="font-size:22px;font-weight:700;color:#023E8A">Activity Log</h2></div>
+<div class="table-container">
+<table><thead><tr>
+<th>#</th><th>Date/Time</th><th>Staff</th><th>Task #</th>
+<th>Field Changed</th><th>New Value</th>
+</tr></thead><tbody id="activityBody"></tbody></table>
+</div>
+
+</div><!-- end tabActivity -->
+
+</div>
+
+<script>
+// ===== DATA =====
+const TASK_DATA = [{"Task List": "CT Pre-D Endo", "Task Number": "21554", "Date Created": "04-18-2026", "Status": "New", "PatNum": "1009127750", "Patient Name": "Joubert, Josua", "DOB": "10-03-1977", "Task Description": "Dr. Lena, Please pre D for root canal #29, core build p and zirconia crwon #29 and mouth guard. Thankyou!", "Task Notes": "sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "107332261", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "21575", "Date Created": "04-18-2026", "Status": "New", "PatNum": "1009127753", "Patient Name": "Joubert, Sone'", "DOB": "11-30-1979", "Task Description": "Dr Umma Lena- rct #13", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "107332262", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "21590", "Date Created": "04-18-2026", "Status": "New", "PatNum": "1009128083", "Patient Name": "SANTOS MIRANDA, BARBARA", "DOB": "06-28-2002", "Task Description": "Dr.Hirra , please pre d for RCT#18, core buildup and ceramic crown #18. Thankyou!", "Task Notes": "sent for RCT", "Insurance Plan": "MEDICAID", "Subscriber ID": "005048846", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "22187", "Date Created": "04-22-2026", "Status": "New", "PatNum": "1009022916", "Patient Name": "COREY, EMMA", "DOB": "02-09-2006", "Task Description": "PRE-D FOR RCT TOOTH #6", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "003220086", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "22751", "Date Created": "04-25-2026", "Status": "New", "PatNum": "1009129196", "Patient Name": "Rivera, Grimar", "DOB": "04-19-1991", "Task Description": "Dr.Graham, please pre d for RCT#15, post and core and crown #15.Thankyou!", "Task Notes": "RCT #15 is submitted.", "Insurance Plan": "MEDICAID", "Subscriber ID": "003222743", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "22754", "Date Created": "04-25-2026", "Status": "New", "PatNum": "1009129199", "Patient Name": "MACK, MILES", "DOB": "08-13-1999", "Task Description": "Dr.Waqar, Please pre D for RCY, corebuildup and full cast metal crown #13. thankyou!", "Task Notes": "RCT#13 is submitted.", "Insurance Plan": "MEDICAID", "Subscriber ID": "002660590", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "22763", "Date Created": "04-25-2026", "Status": "New", "PatNum": "1009127105", "Patient Name": "Urena, Ashlee", "DOB": "02-12-1993", "Task Description": "Dr.Graham, please  pre d for RCT, post and core and PFM crown #8,9. Thankyou!", "Task Notes": "RCT #8-9 are submitted ( If it got pending we may need pic of the teeth if the teeth are discolored, and or what caused necrotic pulps like trauma or anything else.)", "Insurance Plan": "MEDICAID", "Subscriber ID": "004048652", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Endo", "Task Number": "23319", "Date Created": "04-28-2026", "Status": "New", "PatNum": "1009129079", "Patient Name": "Gianelli, Mikayala", "DOB": "12-21-2009", "Task Description": "Dr Jenna Lee- #14 RCT,Post and core and Crown#18 RCT,Post and core and Crownand #3 Post and core and Crown", "Task Notes": "PA sent.", "Insurance Plan": "MEDICAID", "Subscriber ID": "003592984", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7236", "Date Created": "01-09-2026", "Status": "Done", "PatNum": "1009114702", "Patient Name": "TEST, STAMFORD", "DOB": "06-09-2021", "Task Description": "TEST - DO NOT SUBMIT THIS IS A TEST", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "24135486", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7258", "Date Created": "01-09-2026", "Status": "Done", "PatNum": "1000010296", "Patient Name": "Morocho Tenelanda, Nicole M", "DOB": "01-03-2016", "Task Description": "Pano in Dexis, Scan taken-Itero, score sheet filled out and signed. 8080 Full tx, metal brackets U/L", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004247101", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7282", "Date Created": "01-10-2026", "Status": "Done", "PatNum": "1009013117", "Patient Name": "Johnson, Nyree M", "DOB": "05-14-2013", "Task Description": "Submission for HA. Pano in imaging-chart, ceph in Dexis, Scan in Itero. Score sheet filled out. 8080 - full tx", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003951307", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7284", "Date Created": "01-10-2026", "Status": "Done", "PatNum": "1009013117", "Patient Name": "Johnson, Nyree M", "DOB": "05-14-2013", "Task Description": "Husky A submission for D8080, pano on dexis, scan on iTero", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003951307", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7311", "Date Created": "01-12-2026", "Status": "Done", "PatNum": "1005001645", "Patient Name": "Alicea Paduani, Alexander", "DOB": "09-20-2010", "Task Description": "Bill Aetna PPO on file for ortho tx. $3999.00 ", "Task Notes": "initial claim submitted to Aetna for D8080. MB", "Insurance Plan": "DELTA CARE USA", "Subscriber ID": "120967972702", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7411", "Date Created": "01-12-2026", "Status": "Done", "PatNum": "1003024326", "Patient Name": "Pernia, Sebastian ", "DOB": "12-18-2011", "Task Description": "Submit for D8080. Pano and ceph in dexis, score sheet in chart, itero scan complete", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003806514", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "7462", "Date Created": "01-13-2026", "Status": "Done", "PatNum": "1009119421", "Patient Name": "Dunn,  Emilia", "DOB": "09-15-1976", "Task Description": "PLEASE SUBMIT PRE-AUTH FOR 24 MONTHS $,4999", "Task Notes": "pre auth submitted to Pacific Life Dental for D8090. duplicate task. MB", "Insurance Plan": "Pacific Life Dental", "Subscriber ID": "IC0000237272", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Ortho", "Task Number": "7758", "Date Created": "01-14-2026", "Status": "Done", "PatNum": "1009119823", "Patient Name": "Galvez Barrundia, Kelvin", "DOB": "10-23-2012", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS. THANK YOU (STAMFORD)", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "105823536", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "8058", "Date Created": "01-17-2026", "Status": "Done", "PatNum": "1003026319", "Patient Name": "PORTILLO, AXEL N", "DOB": "11-16-2013", "Task Description": "PLEASE SUBMIT TO HA FOR D8080- RECENT PANO LOCATED IN DEXIS AND OLD PANO IN IMAGING TO SHOW IMPACTION (STAMFORD)", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003998914", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "8059", "Date Created": "01-17-2026", "Status": "Done", "PatNum": "1009031531", "Patient Name": "PATINO LEDESMA, SOFIA", "DOB": "08-30-2018", "Task Description": "please submit for d8020 with pano on dexis. (STAMFORD)", "Task Notes": "DENIED RE-EVAL IN 12M ", "Insurance Plan": "MEDICAID", "Subscriber ID": "105721359", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "8062", "Date Created": "01-17-2026", "Status": "Done", "PatNum": "1009031528", "Patient Name": "PATINO LEDESMA, CAMILA", "DOB": "07-17-2014", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS. (STAMFORD)", "Task Notes": "APPROVED SCH FOR 1/31 TO START", "Insurance Plan": "MEDICAID", "Subscriber ID": "105721361", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "8065", "Date Created": "01-17-2026", "Status": "Done", "PatNum": "1003018032", "Patient Name": "CUEVAS, KAYLEE S", "DOB": "08-30-2010", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS. (STAMFORD)", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003668997", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "8110", "Date Created": "01-19-2026", "Status": "Done", "PatNum": "1009030075", "Patient Name": "Nuzzo, Vincent", "DOB": "10-08-2009", "Task Description": "PRE-D FOR BONDING --PATIENT HUSKY INSURANCE WAS TERMED , PATIENT PRESNTED A PPO INSURANCE FOR COVERAGE --Giselle 01/19/2026", "Task Notes": "Received a message from Jhoanny stating the patient no longer has HUSKY A coverage. Cigna PPO info was provided and verified; there is no ortho coverage available. A balance of $1,841.52 was transferred from the ins account to parent responsibility. Jhoanny collected $87.13, which represented the amount currently due under the ins account; this was applied as the IP. The parent will have monthly payments of $117 for 15 months, starting 2/1/26. A new contract was created and saved in Cloud 9 (where the acct originates under \"document cabinet)) for the parent to sign at the next visit. CC info added and auto pay activated. MB", "Insurance Plan": "CIGNA (PPO)", "Subscriber ID": "U11208485 ", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "9896", "Date Created": "02-02-2026", "Status": "Done", "PatNum": "1009008183", "Patient Name": "Wertz, Samuel", "DOB": "07-21-2014", "Task Description": "pre-d D8080, Pano in Dexis, Salz filled out and scanned via itero", "Task Notes": "PA mailed out to Husky B for D8080. No pre auth submitted to DD of NJ due to policy does not include ortho covg. MB", "Insurance Plan": "MEDICAID", "Subscriber ID": "106889046", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "10588", "Date Created": "02-06-2026", "Status": "Done", "PatNum": "1009029977", "Patient Name": "De Lasa, Halle", "DOB": "10-21-2013", "Task Description": "please submit pre-auth for 18 months for $3,999", "Task Notes": "pre auth submitted to Cigna for D8080. MB", "Insurance Plan": "CIGNA (PPO)", "Subscriber ID": "U42639045", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "11837", "Date Created": "02-13-2026", "Status": "Done", "PatNum": "1009001757", "Patient Name": "Pecor, Nathan", "DOB": "09-27-2012", "Task Description": "PRE-D FOR PPO ON FILE FOR FULL ORTHO TX. PARENT WANTS TO PAY IN FULL ONCE WE KNOW INS AMMOUNT - MG (D8080 $3999)", "Task Notes": "Pre auths submitted to both Cigna policies for D8080. MB | Pre auth for mother's Cigna policy received showing $1500 covg. Pre auth for father's Cigna policy received previously showing $1000 covg. Pt has started tx already. MB", "Insurance Plan": "CIGNA (PPO)", "Subscriber ID": "U35706142", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "11966", "Date Created": "02-16-2026", "Status": "New", "PatNum": "1003027919", "Patient Name": "PEART II, JEFFERY B", "DOB": "12-22-2014", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PAN AND LAT.CEPH ON DEXIS (STAMFORD) ", "Task Notes": "Please recreate the 3D MODEL for this patient  | 3D model is not open can you  please recreate the new 3D model for this patient. | 3D model is not open can you  please recreate the new 3D model for this patient. | 3D model is not open can you  please recreate the new 3D model for this patient. | 3D model is not open can you  please recreate the new 3D model for this patient. | 3D model is not open can you  please recreate the new 3D model for this patient. | 3D model is not open can you  please recreate the new 3D model for this patient. | NEW RX CREATED  | 3D model is not open can you  please recreate the new 3D model for this patient. | NEW RX CREATED LAST ATTEMPT  BEFORE NEW SCAN TAKEN  | 3D Model is not opening for this patient | 3D Model is not opening for this patient | Pre Authorization is Pending for 3D Model not Opening | Pre Authorization is Pending for 3D Model not Opening | Pre Authorization is Pending for 3D Model not Opening | Pre Authorization is Pending for 3D Model not Opening | 3D Model is not opening for this patient | new scan taken 4/30 can we please submit for d8080 with pan and lat.ceph (stamford)", "Insurance Plan": "MEDICAID", "Subscriber ID": "004129301", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "13235", "Date Created": "02-21-2026", "Status": "Done", "PatNum": "1009070677", "Patient Name": "Deleon, Briella", "DOB": "06-28-2018", "Task Description": "Please submit for B8220 for tongue crib, pano in dexis, scan taken", "Task Notes": "Pre Authorization submitted for 8220 on 04/20/2026Claim # 2167250 | Status Checked - PendingClaim # 2167250", "Insurance Plan": "MEDICAID", "Subscriber ID": "100757031", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "13241", "Date Created": "02-21-2026", "Status": "Done", "PatNum": "1009006149", "Patient Name": "Paul, Olivia ", "DOB": "12-11-2012", "Task Description": "submit to DD ins for full tx ins info on file needs to be added", "Task Notes": "pre auth submitted to DD of NJ for D8080. MB", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "0713826698", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "13265", "Date Created": "02-21-2026", "Status": "Done", "PatNum": "1003028602", "Patient Name": "TINEO LLERENA, CHARLOTTE", "DOB": "05-29-2015", "Task Description": "PLEASE SUBMIT FOR D8020 WITH PANO ON DEXIS(STAMFORD)", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004200945", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "14345", "Date Created": "02-27-2026", "Status": "Done", "PatNum": "1009010167", "Patient Name": "Lopez, Jacob A", "DOB": "11-17-2014", "Task Description": "Submit to husky for D8080. Scan in itero. Score sheet in chart, pano in dexis ", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004118174", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "6684", "Date Created": "03-01-2026", "Status": "Done", "PatNum": "1009064403", "Patient Name": "Godoy, Jerson", "DOB": "05-31-2012", "Task Description": "MOM NOT READY TO START DUE TO FINANICAL REASONS, SAID SHE WILL CALL BACK", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003945040", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "15251", "Date Created": "03-05-2026", "Status": "Done", "PatNum": "1009012731", "Patient Name": "Brown, Nyla M", "DOB": "08-16-2017", "Task Description": "Please submit D8220 for Tongue Crib, pano in dexis, scan taken", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "100226406", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "15362", "Date Created": "03-06-2026", "Status": "Done", "PatNum": "1009027065", "Patient Name": "Rodriguez, Hailey", "DOB": "05-06-2016", "Task Description": "Pano in Dexis, Scan in Itero, score sheet completed. 8020 PHI RPE", "Task Notes": "Please resubmit this case as D8220. Use same scan, pano and score sheet. Thank you | Pre Authorization submitted for D8220 on 04/20/2026Claim # 2167196 | Status Checked - PendingClaim # 2167196", "Insurance Plan": "MEDICAID", "Subscriber ID": "105537701", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "15384", "Date Created": "03-06-2026", "Status": "Done", "PatNum": "1000001454", "Patient Name": "Andrade, Miguel", "DOB": "08-11-2014", "Task Description": "HUSKY A Sumbit for D8080. Pano in Dexis. Scan in Itero. Score sheet in chart", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004087525", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16116", "Date Created": "03-11-2026", "Status": "Done", "PatNum": "1009001884", "Patient Name": "Serrano, Jeremiah", "DOB": "06-24-2008", "Task Description": "Pre-d D8080, pano in dexis, salz filled out and scanned via itero", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167275 | Status Checked - PendingClaim # 2167275", "Insurance Plan": "MEDICAID", "Subscriber ID": "003443238", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16130", "Date Created": "03-11-2026", "Status": "Done", "PatNum": "1009069054", "Patient Name": "Abzun Pintado, Riley", "DOB": "09-19-2014", "Task Description": "PLEASE SUBMIT FOR D8080  WITH PANO ON DEXIS. (STAMFORD)", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167504 | Status Checked - PendingClaim # 2167504", "Insurance Plan": "MEDICAID", "Subscriber ID": "004174491", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16169", "Date Created": "03-12-2026", "Status": "Done", "PatNum": "1003012419", "Patient Name": "LARA MARTINEZ, WILIAN A", "DOB": "06-14-2011", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO AND LAT.CPH ON DEXIS (STAMFORD)", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167554 | Status Checked - PendingClaim # 2167554", "Insurance Plan": "MEDICAID", "Subscriber ID": "003753184", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16388", "Date Created": "03-13-2026", "Status": "Done", "PatNum": "1003016233", "Patient Name": "CENELIEN, JUSTIN", "DOB": "05-16-2011", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS(STAMFORD) ", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167564 | Status Checked - PendingClaim # 2167564", "Insurance Plan": "MEDICAID", "Subscriber ID": "003745688", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16394", "Date Created": "03-13-2026", "Status": "Done", "PatNum": "1009072889", "Patient Name": "Lima Lemus, Marjorie", "DOB": "05-23-2014", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS(STAMFORD)", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167605  | Status Checked - PendingClaim # 2167605", "Insurance Plan": "MEDICAID", "Subscriber ID": "004064955", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16407", "Date Created": "03-13-2026", "Status": "Done", "PatNum": "1009120005", "Patient Name": "Rodriguez, Ehibram", "DOB": "08-04-2018", "Task Description": "Pre-d D8220, pano in dexis, Salz filled out, scanned via Itero", "Task Notes": "Pre Authorization submitted for D8220 on 4/20/2026Claim # 2167627 | Status Checked - PendingClaim # 2167627", "Insurance Plan": "MEDICAID", "Subscriber ID": "105332652", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "16415", "Date Created": "03-14-2026", "Status": "Done", "PatNum": "1009024203", "Patient Name": "Amaraes Oliveira, Ysadora", "DOB": "09-22-2017", "Task Description": "Husky A submission for RPE and face mask, pano in dexis, scan on iTero. ", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "104343719", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "17417", "Date Created": "03-21-2026", "Status": "Done", "PatNum": "1009011713", "Patient Name": "Paul, Josiah", "DOB": "11-24-2007", "Task Description": "Please submit D8080, pano in dexis, scan taken, scoresheet done", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003392641", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "17435", "Date Created": "03-21-2026", "Status": "Done", "PatNum": "1009011713", "Patient Name": "Paul, Josiah", "DOB": "11-24-2007", "Task Description": "D8080 submission, Husky A, pano in dexis, scan on iTero", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003392641", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "17696", "Date Created": "03-24-2026", "Status": "Done", "PatNum": "1003033111", "Patient Name": "HOLLEY, ZHARA", "DOB": "03-03-2015", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PAN AND LAT.CEPH ON DEXIS (STMFORD)", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004162135", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "18278", "Date Created": "03-27-2026", "Status": "Done", "PatNum": "1003028814", "Patient Name": "ALCAIDE, DUGLAS E", "DOB": "03-04-2007", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO ON DEXIS (STAMFORD) HAS HUSKY A NOW ", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "003606212", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "18386", "Date Created": "03-30-2026", "Status": "Done", "PatNum": "1000011639", "Patient Name": "Polanco, Yadiel G", "DOB": "03-25-2015", "Task Description": "Submit for D8080. Scan in itero. Score sheet in chart. Pano in dexis ", "Task Notes": "Pre Authorization submitted for D8080 on 04/20/2026Claim # 2167637 | Status Checked - PendingClaim # 2167637", "Insurance Plan": "MEDICAID", "Subscriber ID": "004368696", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "18420", "Date Created": "03-30-2026", "Status": "Done", "PatNum": "1009125405", "Patient Name": "Martel, Reyna", "DOB": "01-27-2019", "Task Description": "Pre-e D8220, Salz filled out, Pano in Dexis and scanned via itero", "Task Notes": "Pre Authorization submitted for D8220 on 04/20/2026Claim # 2167658 | Status Checked - PendingClaim # 2167658 | Pre Authorization submitted for D8220 on 04/23/2026Claim # 2170089", "Insurance Plan": "MEDICAID", "Subscriber ID": "103770531", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20261", "Date Created": "04-09-2026", "Status": "Viewed", "PatNum": "1000002762", "Patient Name": "Williams, Devon", "DOB": "01-21-2013", "Task Description": "Pano in dexis, Itero scan, scoresheet filled out. 8080 full tx.", "Task Notes": "Pre Authorization submitted for D8080 on 04/21/2026Claim # 2168128 | Pre Authorization submitted for D8080 on 04/21/2026Claim # 2168288 | Pre Authorization submitted for D8080 on 04/23/2026Claim # 2169862 | Pre Authorization submitted for D8080 on 04/27/2026Claim # 2171996 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "004216798", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20270", "Date Created": "04-09-2026", "Status": "Done", "PatNum": "1003032716", "Patient Name": "HOQUE, MOHAMMED M", "DOB": "09-23-2015", "Task Description": "PLEASE SUBMIT D8020 PANO AND CEPH IN DEXIS($2,800)", "Task Notes": "Pre Authorization submitted for D8020 on 04/21/2026Claim # 2168151 | Pre Authorization submitted for D8080 on 04/21/2026Claim # 2168307 | Pre Authorization submitted for D8080 on 04/23/2026Claim # 2169803", "Insurance Plan": "MEDICAID", "Subscriber ID": "004213409", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20558", "Date Created": "04-11-2026", "Status": "Done", "PatNum": "1009013263", "Patient Name": "Garcia-Valentin, Matthew A", "DOB": "03-17-2012", "Task Description": "Scan in itero, pano in dexis, score sheet complete. full tx", "Task Notes": "Pre Authorization Pending for \"Ortho Modeling\" | Pre Authorization submitted for D8080 on 04/22/2026Claim # 2168922", "Insurance Plan": "MEDICAID", "Subscriber ID": "003832043", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20561", "Date Created": "04-11-2026", "Status": "Done", "PatNum": "1009013439", "Patient Name": "Torres, Mia", "DOB": "05-07-2015", "Task Description": "Scan in itero, pano in dexis, score sheet complete. Full tx 8080", "Task Notes": "Pre Authorization submitted for D8080 on 04/22/2026Claim # 2168939", "Insurance Plan": "MEDICAID", "Subscriber ID": "101542719", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20661", "Date Created": "04-13-2026", "Status": "Viewed", "PatNum": "1009115801", "Patient Name": "Tescahua, Maximiliano", "DOB": "03-29-2017", "Task Description": "Submit to HA for D8020 - Pano in Dexis and score sheet on file - Thanks!", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8020 on 04/27/2026Claim # 2171896 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "103144932", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20687", "Date Created": "04-13-2026", "Status": "Viewed", "PatNum": "1009005543", "Patient Name": "GIL, ALAIA", "DOB": "11-13-2017", "Task Description": "PLEASE SUBMIT FOR D8020 WITH PANO ON DEXIS (STAMFORD )", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8020 on 04/27/2026Claim # 2171914 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "100374360", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "20699", "Date Created": "04-13-2026", "Status": "Viewed", "PatNum": "1009063131", "Patient Name": "Carias De Paz, Jasmine", "DOB": "05-07-2014", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANAND LAT.CEPH ON DEXIS(STAMFORD)", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8080 on 04/27/2026Claim # 2172039 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "004183537", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21368", "Date Created": "04-16-2026", "Status": "Done", "PatNum": "1000012065", "Patient Name": "Gomez, Sofia", "DOB": "08-31-2016", "Task Description": "private insurance (local 191 ANTHEM) submission for D8020 RPE 2x4. scan in itero. pano in dexis. ", "Task Notes": "pre auth submitted to Local 191 for D8020. MB", "Insurance Plan": "LOCAL 191", "Subscriber ID": "TSJ4783300BF", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21452", "Date Created": "04-17-2026", "Status": "Viewed", "PatNum": "1009066258", "Patient Name": "Alves Da Silva Junio, Daniel", "DOB": "11-27-2015", "Task Description": "pano in dexis, scan in itero, score sheet completed for 8080. full tx.", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D 8080 on 04/27/2026Claim # 2172236 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "102878990", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21524", "Date Created": "04-17-2026", "Status": "Viewed", "PatNum": "1009004650", "Patient Name": "Galarza, Danna M", "DOB": "12-07-2014", "Task Description": "Pano in dexis, score sheet, itero scan taken. 8080", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8080 on 04/28/2026Claim # 2172401 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "004126795", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21533", "Date Created": "04-17-2026", "Status": "New", "PatNum": "1003027141", "Patient Name": "LUNDIJIMENEZ, ARLINDA", "DOB": "08-08-2013", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PANO UNDER IMAGING (STAMFORD)", "Task Notes": "DENIED WITH 18 PTS CALLED BUT NO ANSWER BOTH NUMBERS STILL HAS PRIVATE INSURANCE WITH $1,000 TO START ", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "7763935825", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21551", "Date Created": "04-18-2026", "Status": "Viewed", "PatNum": "1009028139", "Patient Name": "Estevez Peralta, Raynelis", "DOB": "09-17-2013", "Task Description": "Pano in dexis/chart, scan in itero, score sheet completed. 8080 - DANBURY", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8080 on 04/28/2026Claim # 2172407 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "105523511", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21584", "Date Created": "04-18-2026", "Status": "Viewed", "PatNum": "1009117729", "Patient Name": "ALVARADO TEMAL, DYLAN", "DOB": "02-27-2015", "Task Description": "Please submit D8080, pano in dexis, scan in itero", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D 8080 on 04/28/2026Claim # 2172413 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "004150264", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21746", "Date Created": "04-20-2026", "Status": "Done", "PatNum": "1000006038", "Patient Name": "Franck, Anthony J", "DOB": "03-04-2010", "Task Description": "ETT: 2yrs Braces  metal U/L", "Task Notes": "", "Insurance Plan": "AETNA", "Subscriber ID": "W265274598", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21755", "Date Created": "04-20-2026", "Status": "New", "PatNum": "1000006038", "Patient Name": "Franck, Anthony J", "DOB": "03-04-2010", "Task Description": "ETT: 2 yearsBrace Type: metalUpper/LowerPatient presents for orthodontic consultation  after referral from primary care dentist.Relationship of the adult who accompanied the patient to the appointment: MotherThe patient has been identified by: asked parent/ guardian to confirm correct patient is in the chair by name and date of birth.Reviewed medical history and confirmed that the information was current and accurate.Oral Cancer screening: WNLIntra-oral soft tissue exam: WNLExtra-oral exam: WNLOral Hygiene- GoodStage of dentition: PrimaryDiagnosis: Consult[Prompt:\"Supplemental Orthodontic Forms\"]Treatment plan:  [Prompt:\"Ortho tx plan_1\"]Panorex x-ray takenOral Surgeon referral given: [Prompt:\"OS REFERRAL GIVEN\"]Reason for referral: [Prompt:\"OS REFERRAL REASON\"]Orthodontist: Dr. Neil Ramaswamy, License #14612Assistant: Joshua RuizBehavior: CooperativeNext visit: Records", "Task Notes": "", "Insurance Plan": "AETNA", "Subscriber ID": "W265274598", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21924", "Date Created": "04-20-2026", "Status": "Viewed", "PatNum": "1009074071", "Patient Name": "Castro-Clavijo, Kelvis Y", "DOB": "06-15-2012", "Task Description": "Pre-d D8080, Pano in dexis, Salz filled out, Scanned via itero", "Task Notes": "Status Checked - Pending for Ortho Modelling | Pre Authorization submitted for D8080 on 04/28/2026Claim # 2172423 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "003854601", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Ortho", "Task Number": "21926", "Date Created": "04-20-2026", "Status": "Done", "PatNum": "1009126103", "Patient Name": "UMANZOR, HAILEY", "DOB": "02-02-2012", "Task Description": "Please submit pre-auth for D8080, pano in dexis", "Task Notes": "pre auth submitted to MetLife for D8080. MB", "Insurance Plan": "MET LIFE", "Subscriber ID": "675-95-9660", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "22154", "Date Created": "04-21-2026", "Status": "Done", "PatNum": "1003027430", "Patient Name": "MORENO PAZ, JOHNNY ", "DOB": "09-30-2014", "Task Description": "PLEASE MAILOUT HUSKY B SUBMISSION FOR D8080 (STAMFORD )", "Task Notes": "PA mailed to Husky B for D8080. MB", "Insurance Plan": "MEDICAID", "Subscriber ID": "004214679", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "22536", "Date Created": "04-23-2026", "Status": "Viewed", "PatNum": "1009013896", "Patient Name": "JACKSON, NOVAA", "DOB": "02-03-2019", "Task Description": "PLASE SUBMIT FOR D8020 PANO IN DEXIS ", "Task Notes": "Pre Authorization submitted for D8020 on 04/28/2026Claim # 2172427 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "101190690", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "22541", "Date Created": "04-23-2026", "Status": "Viewed", "PatNum": "1009064480", "Patient Name": "Rivera, Christopher", "DOB": "02-10-2015", "Task Description": "PLEASE SUBMIT FOR D8080 WITH PAN AND LAT.CEPH ON DEIXS (STAMFORD)", "Task Notes": "Pre Authorization submitted for D 8080 on 04/28/2026Claim # 2172455 | Status Checked - Pending", "Insurance Plan": "MEDICAID", "Subscriber ID": "103251639", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "22709", "Date Created": "04-25-2026", "Status": "Done", "PatNum": "1009128560", "Patient Name": "Fonseca, Michael", "DOB": "10-02-1997", "Task Description": "Please Pre-D for D8080 Clear Aligners (Spark) full tx $4999.00 Thanks! ", "Task Notes": "Pre auth submitted to UHC for D8090. MB", "Insurance Plan": "United Health Care Dental", "Subscriber ID": "992095814", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Ortho", "Task Number": "22715", "Date Created": "04-25-2026", "Status": "Done", "PatNum": "1003027543", "Patient Name": "VALDEZ, ABIGAIL", "DOB": "01-28-2014", "Task Description": "PLEASE SUBMITPRE-AUTH FOR 12-15 MONTHS 4,999 (STAMFORD ) ", "Task Notes": "Pre auth submitted to DD of NJ for D 8080. MB", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "6158571621", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "22748", "Date Created": "04-25-2026", "Status": "Done", "PatNum": "1009002844", "Patient Name": "Carter, Elijah", "DOB": "04-10-2015", "Task Description": "1 Year eval, Metal braces, Upper, lower Patient presents for orthodontic consultation  after referral from primary care dentist.Relationship of the adult who accompanied the patient to the appointment: MotherThe patient has been identified by: asked parent/ guardian to confirm correct patient is in the chair by name and date of birth.Reviewed medical history and confirmed that the information was current and accurate.Oral Cancer screening: WNLIntra-oral soft tissue exam: WNLExtra-oral exam: WNLOral Hygiene- FairStage of dentition: PermanentDiagnosis: Cl 1 Upper and lowrer, OB: 50%, OJ 2-3mm, Mild spaces Upper and lower, No crowding 1 year eval[Prompt:\"Supplemental Orthodontic Forms\"]Treatment plan:  Re-eval in 24 monthsPanorex x-ray takenOral Surgeon referral given: [Prompt:\"OS REFERRAL GIVEN\"]Reason for referral: [Prompt:\"OS REFERRAL REASON\"]Orthodontist: Dr. Anna Adjei, License #14440Assistant: Joshua RuizBehavior: CooperativeNext visit: Records", "Task Notes": "Pre auth submitted to DD of NJ for D 8080. MB", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "1033543888", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Ortho", "Task Number": "23185", "Date Created": "04-28-2026", "Status": "Done", "PatNum": "1003027141", "Patient Name": "LUNDIJIMENEZ, ARLINDA", "DOB": "08-08-2013", "Task Description": "please submit pre-auth  for 18 months 3,999(stamford)", "Task Notes": "pre auth submitted to DD of NJ for D8080. Task has been added to pre auth report. MB", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "7763935825", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "23585", "Date Created": "04-29-2026", "Status": "New", "PatNum": "1003016870", "Patient Name": "VALDEZ, ELISHA", "DOB": "11-02-2008", "Task Description": "PLEASE SUBMIT PRE-AUTH FOR 24 MONTHS 3,999", "Task Notes": "", "Insurance Plan": "DELTA DENTAL PLAN (NJ) Premier", "Subscriber ID": "6158571621", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Ortho", "Task Number": "23588", "Date Created": "04-29-2026", "Status": "New", "PatNum": "1003030894", "Patient Name": "CARRERA, JOSE E", "DOB": "01-30-2015", "Task Description": "PLEASE MAIL OUT HB SUBMISSION FOR D8080 WITH PAN AND CEPH ON DEXIS (STAMFORD )", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004140538", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "7276", "Date Created": "01-10-2026", "Status": "Done", "PatNum": "1009119427", "Patient Name": "ROMAN, GLORIA", "DOB": "09-28-1970", "Task Description": "***VOID***", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "002910986", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "9331", "Date Created": "01-27-2026", "Status": "Done", "PatNum": "1009003386", "Patient Name": "RAINEY, QUASHAUN L", "DOB": "12-14-2016", "Task Description": "Please submit pre authorization with coach's letter under consent/letters for sports guard. ", "Task Notes": "please identify the type of mouth guard needed. Soft or Hard? D9944 or D9945 and please add it to Tx plan. | I added the code, its a soft huard | Thanks. Pre-D is submitted | PA submitted with athletic guard 9941", "Insurance Plan": "CIGNA DHMO", "Subscriber ID": "U33254879", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "9418", "Date Created": "01-28-2026", "Status": "Done", "PatNum": "1009003386", "Patient Name": "RAINEY, QUASHAUN L", "DOB": "12-14-2016", "Task Description": "Could you please clarify the type of the occlusal guard D9944 Hard or D9945 Soft?", "Task Notes": "PA submitted", "Insurance Plan": "CIGNA DHMO", "Subscriber ID": "U33254879", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "10141", "Date Created": "02-03-2026", "Status": "Done", "PatNum": "1009121527", "Patient Name": "Geer, Kyle", "DOB": "09-20-1972", "Task Description": "*VOID*", "Task Notes": "", "Insurance Plan": "CIGNA (PPO)", "Subscriber ID": "U13681827", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "12530", "Date Created": "02-18-2026", "Status": "Done", "PatNum": "1009115545", "Patient Name": "Pequere, Harrielle", "DOB": "12-14-2006", "Task Description": "PRE-D FOR POST AND CORE FOR TH #15DR GRAHAM", "Task Notes": "PA submitted THE SUBMITTED X-RAYS ARE NOT OF DIAGNOSTIC QUALITY for RCT #15 DOS 01-23-2026 | Resubmitted with current x-ray", "Insurance Plan": "MEDICAID", "Subscriber ID": "106613157", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "14201", "Date Created": "02-26-2026", "Status": "New", "PatNum": "1009123970", "Patient Name": "VASQUEZ JR, RAUL", "DOB": "06-27-1965", "Task Description": "Dr. Barbra Graham Please approve Cast metel LPD,BUILD UP ON #4,  post and core , and crowns for # 4, 5,14,21 and SRP for the URQ and the ULQ_TB ", "Task Notes": "It's not clear, do we need post and core or core bu for each tooth? | The action plan misses SRP and It's essential when submitting PA for SRP. Narrative is needed | the action plan has SRP attached and it would be the post and core as treatment planned | #5 14 21 has both P&C and Core BU in Tx plan, Only core bu is allowed for non endo treated teeth | I removed the core bu, the chart is accurate for p/c as it shows teeth #5, #14 and #21 are referred to complete rcts w endo. for now we can just pred for #4 until we get post op radiographs after pt attends endo approintment | Thanks Rahmon, P/C and crown are  submitted for #4", "Insurance Plan": "MEDICAID", "Subscriber ID": "107202208", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "14411", "Date Created": "02-28-2026", "Status": "Done", "PatNum": "1009121857", "Patient Name": "JONES, KENNETH", "DOB": "01-25-2001", "Task Description": "P", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "002979207", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "16826", "Date Created": "03-17-2026", "Status": "New", "PatNum": "1009124564", "Patient Name": "Huertas, Victoria", "DOB": "09-23-1989", "Task Description": "Please Pre-D for RCT, P/C, and Crown on tooth #4Dr Barbara Graham #11412", "Task Notes": "RCT #4 SUBMITTED | Pending review | RCT #4 is approved and requires final treatment x-ray | PA sent. for post review. P/C and Cr #4", "Insurance Plan": "MEDICAID", "Subscriber ID": "001678227", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "17453", "Date Created": "03-21-2026", "Status": "Done", "PatNum": "1009125944", "Patient Name": "GOMES, XAVIER", "DOB": "12-31-1947", "Task Description": "DR RECOMMENDING CLEANINGS EVERY 6MOS DUE TO MEDICAL HX", "Task Notes": "Can they provide a medical letter from PCP? | husky already has record of pt's medical history, once we submit they will access | Last cleaning was in october 2025 ( 5 months) I will add remark of new clinic instead of 6 month rate. | Approved", "Insurance Plan": "MEDICAID", "Subscriber ID": "003274128", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "18767", "Date Created": "03-31-2026", "Status": "New", "PatNum": "1009126559", "Patient Name": "Ruiz, Amarilys", "DOB": "03-04-1976", "Task Description": "please eval for core build up and crown for # 30. Thank you ", "Task Notes": "Narrative is needed please including vitality status. | Tooth #30 presents with a multisurface fractured amalgam with several craze lines (See I/O photo)To restore and protect the tooth, a full-coverage crown is recommended. This will enhance the structural integrity and longevity of the tooth, reduce the risk of fracture, and minimize the incidence of recurrent caries. Given the existing condition and loss of tooth structure, a crown provides the most predictable long-term prognosis compared to alternative restorative options.Pulpal status: VitalDx: Reversible pulpitis with normal apical periodontium | Thanks Dr.Barbara. PA sent.", "Insurance Plan": "MEDICAID", "Subscriber ID": "001648737", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "19733", "Date Created": "04-07-2026", "Status": "Done", "PatNum": "1009126910", "Patient Name": "MARIS-GUIA GONCALVES, GABRIELA", "DOB": "05-03-1950", "Task Description": "Dr. Graham , Please pre D for upper cast metal partial #1,2,3,4,9,10,12,13,14,15,16 and lower cast metal partial # 18,19,20,28,29,30,31. Thankyou!", "Task Notes": "Submitted", "Insurance Plan": "MEDICAID", "Subscriber ID": "004227227", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "20480", "Date Created": "04-10-2026", "Status": "New", "PatNum": "1009124711", "Patient Name": "Aponte, Wilson", "DOB": "08-11-1963", "Task Description": "PRE-D FOR RCT ON TOOTH #10", "Task Notes": "PA sent | Any updates?  | Pending review. I'm checking all PAs after 10 days frequently, will update you as soon as possible. | RCT #10 is Approved | scheduled for 5/1 | Post review is submitted and P/C and Crown #10", "Insurance Plan": "MEDICAID", "Subscriber ID": "101164655", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "20987", "Date Created": "04-14-2026", "Status": "Done", "PatNum": "1009122799", "Patient Name": "Savinon, Modesto", "DOB": "06-15-1978", "Task Description": "Dr Barbara Graham disregard", "Task Notes": "", "Insurance Plan": "MEDICAID", "Subscriber ID": "004048081", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21089", "Date Created": "04-15-2026", "Status": "New", "PatNum": "1009126223", "Patient Name": "Noj Peinado, Lesbia", "DOB": "04-17-1984", "Task Description": "DR DAYOUNG LEE- PRED FOR FLIPPER ON #10. HYG APPT IS SCHEDULED TO 4/29 @4PM TO RECIEVE ALL XRAYS AND INFO NEEDED. PLANS TO GET PONTIC ONCE EXT IS COMPLETE. -CV", "Task Notes": "PA sent | Denied REQUESTED SERVICE(S) DO NOT MEET MSP STANDARDS | Resubmitted for D5211 as per the state's instructions", "Insurance Plan": "MEDICAID", "Subscriber ID": "101570814", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21449", "Date Created": "04-17-2026", "Status": "New", "PatNum": "1009115037", "Patient Name": "RECINOS OLIVA, DANIELA", "DOB": "04-06-2004", "Task Description": "PRE-D FOR TOOTH #8", "Task Notes": "What is needed for #8? | pt is over annual max, pred needed for filling | Thanks. PA sent. | Pending ", "Insurance Plan": "MEDICAID", "Subscriber ID": "106754799", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21477", "Date Created": "04-17-2026", "Status": "New", "PatNum": "1009029863", "Patient Name": "Unaucho Torres, Sarahi N", "DOB": "01-06-2010", "Task Description": "can we please submit a Pre-Auth for tooth #12 full coverage crown. 1PA taken 4/6/2026. thank you :)", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "106182478", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21545", "Date Created": "04-18-2026", "Status": "New", "PatNum": "1003026569", "Patient Name": "LONEY, DELISA A", "DOB": "12-24-2005", "Task Description": "teeth#4 #13 cbu and crowns", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "003736213", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21569", "Date Created": "04-18-2026", "Status": "New", "PatNum": "1003026569", "Patient Name": "LONEY, DELISA A", "DOB": "12-24-2005", "Task Description": "HELLO - PT NEEDS PRM FOR TEETH #4 AND #13 - THANK YOU!", "Task Notes": "PA submitted for PFM crowns and core bu, (couldn't find I/O images despite being mentioned in the notes)", "Insurance Plan": "MEDICAID", "Subscriber ID": "003736213", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21909", "Date Created": "04-20-2026", "Status": "New", "PatNum": "1005001317", "Patient Name": "Petruny, Nathan J", "DOB": "02-26-2009", "Task Description": "can we please submit a pre auth for tooth #3- PFM. 1PA taken todayNarrative: tooth #3 previously RCT treated asymptomatic full coverage crown restoration indicated.thank you :)", "Task Notes": "Thanks Dr. AshleyPA sent for full cast crown, the only covered for molars by Husky.", "Insurance Plan": "MEDICAID", "Subscriber ID": "003551868", "Home Office": "Presto Dental PLLC, Derby"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "21977", "Date Created": "04-21-2026", "Status": "New", "PatNum": "1009128503", "Patient Name": "West, Towana", "DOB": "06-19-1962", "Task Description": "Dr.Barbara Graham, Please pre-d for upper full dentures and lower partial dentures. Thank you!", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "001376823", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22208", "Date Created": "04-22-2026", "Status": "New", "PatNum": "1009075742", "Patient Name": "Campbell, Tonia", "DOB": "08-09-1983", "Task Description": "HELLO - PT NEEDS PFM ON #26 THANK YOU", "Task Notes": "PA sent for #26(May get pending for a couple of months due to periapical radiolucency)", "Insurance Plan": "MEDICAID", "Subscriber ID": "004172460", "Home Office": "Presto Dental PLLC, Stamford"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22268", "Date Created": "04-22-2026", "Status": "New", "PatNum": "1009128824", "Patient Name": "Clarke, Sabrina", "DOB": "03-25-1987", "Task Description": "Dr Barbara Graham- post core and crown #15, lower rpd", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "105998288", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22331", "Date Created": "04-22-2026", "Status": "New", "PatNum": "1009125464", "Patient Name": "VASQUEZ RODRIGUEZ, PAMELA", "DOB": "06-29-1993", "Task Description": "pre-d for fillings tooth # 12,13 **went over annual max**", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "102355221", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22346", "Date Created": "04-22-2026", "Status": "New", "PatNum": "1009125884", "Patient Name": "Veliz, Jessica", "DOB": "07-06-1994", "Task Description": "PRE-D FOR HARD NIGHT GUARD", "Task Notes": "PA sentBut will probably get pending due to missing radiograph", "Insurance Plan": "MEDICAID", "Subscriber ID": "106998560", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22586", "Date Created": "04-24-2026", "Status": "New", "PatNum": "1009011828", "Patient Name": "Montano, Giselle", "DOB": "05-29-1981", "Task Description": "HARD NG", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "002251821", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22676", "Date Created": "04-24-2026", "Status": "New", "PatNum": "1009128995", "Patient Name": "Vieira-Deoliveira, Celiane", "DOB": "02-12-1973", "Task Description": "Dr Umme Lena- rct #19 post and core #4 and #19core bu #31crown #4, #19, #31", "Task Notes": "PA sent for RCT #19P/C + PFM CR. #4CBU +CR #19 (stated that the tooth is vital, please confirm the vitality status next appt)", "Insurance Plan": "MEDICAID", "Subscriber ID": "003837041", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22679", "Date Created": "04-24-2026", "Status": "New", "PatNum": "1005000027", "Patient Name": "Strackman, Aiden", "DOB": "01-04-2013", "Task Description": "PRE-D FOR NITROUS --DRS NOTE IS UNDER IMAGINING --", "Task Notes": "When was Nitrous used and what for? | it was not used yet, we're trying to send pre-d first to avoid pt having balancept is 13 years old and needs a RCT but is very anxious and exhibits signs of special needs | I'll add this in the remarks and send PA. ", "Insurance Plan": "MEDICAID", "Subscriber ID": "003915555", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22703", "Date Created": "04-25-2026", "Status": "New", "PatNum": "1009128842", "Patient Name": "Guerrier, Willy", "DOB": "12-18-1958", "Task Description": "Dr.Graham, please pre d for post and core and full cast metal crown #30. ThankYOU!", "Task Notes": "PA sent.", "Insurance Plan": "MEDICAID", "Subscriber ID": "003551734", "Home Office": "Presto Dental PLLC, Bridgeport "}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "22727", "Date Created": "04-25-2026", "Status": "New", "PatNum": "1009129175", "Patient Name": "Barbosa Da Silva, James", "DOB": "05-30-1982", "Task Description": "DR DAYOUNG LEE - PRED FOR CROWNS, CBU, PARTIAL METAL MAND DENTURE, FULL MAX DENTURE, AND FLIPPER TO REPLACE #6,7,8. -CV", "Task Notes": "PA sent But may get pending due to missing FMX or panorex & vitality status of lower teeth .", "Insurance Plan": "MEDICAID", "Subscriber ID": "102947813", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "23338", "Date Created": "04-28-2026", "Status": "New", "PatNum": "1009018877", "Patient Name": "Godoy Guzman, Evelyn A", "DOB": "10-24-2005", "Task Description": "can we please submit a Pre-Auth for full coverage crown on tooth #14Narrative: asymptomatic previously RCT treated tooth #14 with extensive loss of tooth structure full coverage crown indicated. 1PA (tooth #14) taken today. thank you :)", "Task Notes": "Thanks Dr. Ashley. PA sent.", "Insurance Plan": "MEDICAID", "Subscriber ID": "103362617", "Home Office": "Presto Dental PLLC, Danbury"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "23414", "Date Created": "04-29-2026", "Status": "New", "PatNum": "1000004266", "Patient Name": "Mcgee, Akil I", "DOB": "04-21-2006", "Task Description": "DR DAYOUNG LEE- PRED FOR SILVER CROWN ON TOOTH #30 -CV", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "003239517", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "23567", "Date Created": "04-29-2026", "Status": "New", "PatNum": "1009128401", "Patient Name": "Brown, Justina", "DOB": "04-10-1985", "Task Description": "DR DAYOUNG LEE- PRED FOR LOWER COMPLETE DENTURE AND FLIPPER FOR TEETH #25-22 -CV", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "001202132", "Home Office": "Presto Dental PLLC, Norwalk"}, {"Task List": "CT Pre-D Pedo/GP", "Task Number": "23570", "Date Created": "04-29-2026", "Status": "New", "PatNum": "1009071355", "Patient Name": "Jimenez, Emilee L", "DOB": "12-12-2006", "Task Description": "DR DAYOUNG LEE - PRED FOR SILVER CROWN TEETH #3 -CV", "Task Notes": "PA sent", "Insurance Plan": "MEDICAID", "Subscriber ID": "004306800", "Home Office": "Presto Dental PLLC, Danbury"}];
+
+// ===== FIREBASE =====
+const firebaseConfig = {
+    apiKey: "AIzaSyBi5gB6LDCZOzOYOmFaqsmxz8MBbxNiNVg",
+    authDomain: "abra-oic-ct.firebaseapp.com",
+    databaseURL: "https://abra-oic-ct-default-rtdb.firebaseio.com",
+    projectId: "abra-oic-ct"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const STATUSES_PATH = 'ct_pred_statuses';
+
+const PASSWORD = 'CTPreD2026';
+let taskData = [];
+let statuses = {};
+let staffList = new Set();
+
+function checkPassword() {
+    if (document.getElementById('passwordInput').value === PASSWORD) {
+        document.getElementById('passwordOverlay').style.display = 'none';
+        document.getElementById('mainDashboard').style.display = 'block';
+        loadData();
+    } else {
+        document.getElementById('passwordError').style.display = 'block';
+    }
+}
+
+function loadData() {
+    taskData = TASK_DATA.filter(r => r['Task Number'] && r['Patient Name']);
+    document.getElementById('lastUpdated').textContent = 'Data: 1/1/2026 - 4/30/2026 | ' + taskData.length + ' tasks loaded';
+    loadActivity();
+    db.ref(STATUSES_PATH).on('value', snap => {
+        statuses = snap.val() || {};
+        staffList.clear();
+        Object.values(statuses).forEach(s => {
+            if (s.staff && s.staff.length > 0) staffList.add(s.staff);
+        });
+        updateStaffFilter();
+        updateOfficeFilter();
+        renderTable();
+        updateTabBadges();
+    });
+}
+
+function updateStaffFilter() {
+    const sel = document.getElementById('filterStaff');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Staff</option>';
+    [...staffList].sort().forEach(s => { sel.innerHTML += '<option value="'+s+'">'+s+'</option>'; });
+    sel.value = cur;
+}
+
+function updateOfficeFilter() {
+    var sel = document.getElementById('filterOffice');
+    var cur = sel.value;
+    var offices = new Set();
+    taskData.forEach(function(t){ var o = (t['Home Office']||'').trim(); if(o) offices.add(o); });
+    sel.innerHTML = '<option value="">All Offices</option>';
+    [...offices].sort().forEach(function(o){ sel.innerHTML += '<option value="'+o+'">'+o+'</option>'; });
+    sel.value = cur;
+}
+
+function getKey(row) { return 'T' + (row['Task Number']||'').toString().replace(/[^a-zA-Z0-9]/g,''); }
+function saveStatus(key,field,value) {
+    if(!statuses[key]) statuses[key] = {};
+    statuses[key][field] = value;
+    // Auto-record submission date when Pre-D set to Yes
+    if(field==='submission' && value==='Yes' && !statuses[key].submission_date) {
+        var today = new Date().toISOString().split('T')[0];
+        statuses[key].submission_date = today;
+        db.ref(STATUSES_PATH+'/'+key+'/submission_date').set(today);
+    }
+    // Clear submission date if set back to No or blank
+    if(field==='submission' && (value===''||value==='No')) {
+        statuses[key].submission_date = '';
+        db.ref(STATUSES_PATH+'/'+key+'/submission_date').set('');
+    }
+    updateStats();
+    db.ref(STATUSES_PATH+'/'+key+'/'+field).set(value);
+    logActivity(key, field, value);
+}
+
+function saveFollowupRemark(key, value) {
+    if(!statuses[key]) statuses[key] = {};
+    statuses[key].followup_remarks = value;
+    var today = new Date();
+    var dateStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
+    statuses[key].last_followup_date = dateStr;
+    db.ref(STATUSES_PATH+'/'+key+'/followup_remarks').set(value);
+    db.ref(STATUSES_PATH+'/'+key+'/last_followup_date').set(dateStr);
+    logActivity(key, 'followup_remarks', value);
+}
+
+function getDaysWaiting(st) {
+    if(!st.submission_date || st.completed==='Yes') return -1;
+    var parts = st.submission_date.split('-');
+    var subDate = new Date(parts[0],parts[1]-1,parts[2]);
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    return Math.floor((today - subDate) / (1000*60*60*24));
+}
+
+function getDaysBadge(days) {
+    if(days < 0) return '';
+    if(days < 5) return '<span class="days-badge days-ok">'+days+'d</span>';
+    if(days < 10) return '<span class="days-badge days-warn">'+days+'d</span>';
+    return '<span class="days-badge days-critical">'+days+'d</span>';
+}
+
+function updateStats() {
+    var counts = {total:0,submitted:0,pending:0,waiting:0,needinfo:0,completed:0,overdue:0};
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        counts.total++;
+        var sub = st.submission||'';
+        if(sub==='Yes') counts.submitted++;
+        else if(sub==='No'||!sub) counts.pending++;
+        if(sub==='Waiting for Response') counts.waiting++;
+        if(sub==='Need Info from Office') counts.needinfo++;
+        if((st.completed||'')==='Yes') counts.completed++;
+        var days = getDaysWaiting(st);
+        if(days >= 5) counts.overdue++;
+    });
+    document.getElementById('statTotal').textContent = counts.total;
+    document.getElementById('statSubmitted').textContent = counts.submitted;
+    document.getElementById('statPending').textContent = counts.pending;
+    document.getElementById('statWaiting').textContent = counts.waiting;
+    document.getElementById('statNeedInfo').textContent = counts.needinfo;
+    document.getElementById('statOverdue').textContent = counts.overdue;
+    document.getElementById('statCompleted').textContent = counts.completed;
+}
+
+function getDropdownClass(v) {
+    if(!v) return '';
+    v = v.toLowerCase();
+    if(v==='yes') return 'val-yes';
+    if(v==='no') return 'val-no';
+    if(v.includes('waiting')) return 'val-waiting';
+    if(v.includes('need info')) return 'val-needinfo';
+    if(v==='resubmitted') return 'val-resubmitted';
+    if(v==='final response') return 'val-final';
+    return '';
+}
+
+function makeDropdown(key,field,options,cur) {
+    var cls = getDropdownClass(cur);
+    var h = '<select class="cell-dropdown '+cls+'" onchange="saveStatus(\''+key+'\',\''+field+'\',this.value);this.className=\'cell-dropdown \'+getDropdownClass(this.value)">';
+    h += '<option value="">--</option>';
+    options.forEach(function(o){ h += '<option value="'+o+'"'+(cur===o?' selected':'')+'>'+o+'</option>'; });
+    h += '</select>';
+    return h;
+}
+
+function makeStaffDropdown(key,cur) {
+    var cls = cur ? 'val-yes' : '';
+    var h = '<select class="cell-dropdown '+cls+'" onchange="handleStaffChange(\''+key+'\',this.value);this.className=\'cell-dropdown \'+(this.value?\'val-yes\':\'\')">';
+    h += '<option value="">--</option>';
+    var defaults = ['MB','MA','JO'];
+    defaults.forEach(function(d){ staffList.add(d); });
+    var all = [...staffList].sort();
+    if(cur && !all.includes(cur)) all.push(cur);
+    all.sort().forEach(function(s){ h += '<option value="'+s+'"'+(cur===s?' selected':'')+'>'+s+'</option>'; });
+    h += '<option value="__new__">+ Add New...</option></select>';
+    return h;
+}
+
+function handleStaffChange(key,value) {
+    if(value==='__new__'){
+        var name=prompt('Enter staff member name:');
+        if(name&&name.trim()){ staffList.add(name.trim()); saveStatus(key,'staff',name.trim()); updateStaffFilter(); renderTable(); }
+        return;
+    }
+    saveStatus(key,'staff',value);
+}
+
+function getStatusBadge(s) {
+    if(!s) return '';
+    var l=s.toLowerCase();
+    if(l==='new') return '<span class="badge badge-new">New</span>';
+    if(l==='viewed') return '<span class="badge badge-viewed">Viewed</span>';
+    if(l==='done') return '<span class="badge badge-done">Done</span>';
+    return s;
+}
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function renderTable() {
+    var filterTLSel = document.getElementById('filterTaskList');
+    var filterTLRaw = [];
+    for(var i=0;i<filterTLSel.selectedOptions.length;i++) filterTLRaw.push(filterTLSel.selectedOptions[i].value);
+    var filterTL = filterTLRaw.indexOf('__all__')>=0 ? [] : filterTLRaw;
+    var filterSub = document.getElementById('filterSubmission').value;
+    var filterDays = document.getElementById('filterDays').value;
+    var filterComp = document.getElementById('filterCompleted').value;
+    var filterStaff = document.getElementById('filterStaff').value;
+    var filterOffice = document.getElementById('filterOffice').value;
+    var search = document.getElementById('searchInput').value.toLowerCase();
+
+    var counts = {total:0,submitted:0,pending:0,waiting:0,needinfo:0,completed:0,overdue:0};
+    var html = '';
+    var row = 0;
+
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        var days = getDaysWaiting(st);
+
+        if(filterTL.length>0 && filterTL.indexOf(t['Task List'])<0) return;
+        if(filterOffice && (t['Home Office']||'').trim() !== filterOffice) return;
+        if(filterSub==='__notset__'){ if(st.submission&&st.submission!=='') return; }
+        else if(filterSub && (st.submission||'')!==filterSub) return;
+        if(filterDays==='overdue' && days<5) return;
+        if(filterDays==='critical' && days<10) return;
+        if(filterComp && (st.completed||'')!==filterComp) return;
+        if(filterStaff && (st.staff||'')!==filterStaff) return;
+        if(search){
+            var hay = ((t['Patient Name']||'')+' '+(t['PatNum']||'')+' '+(t['Task Description']||'')+' '+(t['Insurance Plan']||'')).toLowerCase();
+            if(hay.indexOf(search)<0) return;
+        }
+
+        row++;
+        counts.total++;
+        var sub = st.submission||'';
+        if(sub==='Yes') counts.submitted++;
+        else if(sub==='No'||!sub) counts.pending++;
+        if(sub==='Waiting for Response') counts.waiting++;
+        if(sub==='Need Info from Office') counts.needinfo++;
+        if((st.completed||'')==='Yes') counts.completed++;
+        if(days>=5) counts.overdue++;
+
+        var isCom = st.completed==='Yes';
+        var rowClass = isCom ? 'completed-row' : (days>=10 ? 'row-overdue' : (days>=5 ? 'row-warn' : ''));
+
+        html += '<tr class="'+rowClass+'">';
+        html += '<td>'+row+'</td>';
+        html += '<td>'+(t['Task List']||'')+'</td>';
+        html += '<td>'+(t['Task Number']||'')+'</td>';
+        html += '<td>'+(t['Date Created']||'')+'</td>';
+        html += '<td>'+getStatusBadge(t['Status'])+'</td>';
+        html += '<td>'+(t['PatNum']||'')+'</td>';
+        html += '<td>'+(t['DOB']||'')+'</td>';
+        html += '<td>'+(t['Home Office']||'')+'</td>';
+        html += '<td>'+(t['Insurance Plan']||'')+'</td>';
+        html += '<td>'+(t['Subscriber ID']||'')+'</td>';
+        html += '<td class="task-desc" title="'+esc(t['Task Description'])+'">'+(t['Task Description']||'')+'</td>';
+        html += '<td>'+makeStaffDropdown(key,st.staff||'')+'</td>';
+        html += '<td>'+makeDropdown(key,'submission',['Yes','No'],st.submission||'')+'</td>';
+        html += '<td><input type="date" class="cell-dropdown" value="'+(st.submission_date||'')+'" onchange="saveStatus(\''+key+'\',\'submission_date\',this.value);renderTable()" style="width:130px"></td>';
+        html += '<td>'+makeDropdown(key,'updated_od',['Yes','No'],st.updated_od||'')+'</td>';
+        html += '<td style="text-align:center">'+getDaysBadge(days)+'</td>';
+        html += '<td>'+makeDropdown(key,'completed',['Yes','No'],st.completed||'')+'</td>';
+        html += '<td><input type="text" class="cell-dropdown" value="'+esc(st.remarks||'')+'" placeholder="Add remark..." onchange="saveStatus(\''+key+'\',\'remarks\',this.value)" style="min-width:180px"></td>';
+        html += '</tr>';
+    });
+
+    document.getElementById('taskBody').innerHTML = html;
+    document.getElementById('statTotal').textContent = counts.total;
+    document.getElementById('statSubmitted').textContent = counts.submitted;
+    document.getElementById('statPending').textContent = counts.pending;
+    document.getElementById('statWaiting').textContent = counts.waiting;
+    document.getElementById('statNeedInfo').textContent = counts.needinfo;
+    document.getElementById('statOverdue').textContent = counts.overdue;
+    document.getElementById('statCompleted').textContent = counts.completed;
+}
+
+function resetFilters() {
+    var opts = document.getElementById('filterTaskList').options;
+    for(var i=0;i<opts.length;i++) opts[i].selected = (opts[i].value==='__all__');
+    document.getElementById('filterSubmission').value = '';
+    document.getElementById('filterDays').value = '';
+    document.getElementById('filterCompleted').value = '';
+    document.getElementById('filterStaff').value = '';
+    document.getElementById('filterOffice').value = '';
+    document.getElementById('searchInput').value = '';
+    renderTable();
+}
+
+function exportCSV() {
+    var csv = 'Task List,Task Number,Date Created,OD Status,PatNum,DOB,Home Office,Insurance,Subscriber ID,Task Description,Pre-D Submission,Submission Date,Assigned Staff,Updated Task in OD,Task Completed,Remarks\n';
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        csv += [t['Task List'],t['Task Number'],t['Date Created'],t['Status'],
+            t['PatNum'],t['DOB'],
+            '"'+esc(t['Home Office']||'')+'"','"'+esc(t['Insurance Plan']||'')+'"',t['Subscriber ID'],
+            '"'+esc(t['Task Description']||'')+'"',
+            st.submission||'',st.submission_date||'',st.staff||'',st.updated_od||'',st.completed||'','"'+esc(st.remarks||'')+'"'
+        ].join(',')+'\n';
+    });
+    var blob = new Blob([csv],{type:'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'CT_PreD_Dashboard_Export.csv';
+    a.click();
+}
+
+// Task list multi-select logic
+document.getElementById('filterTaskList').addEventListener('change', function() {
+    var opts = this.options;
+    var allOpt = opts[0];
+    var selected = [];
+    for(var i=0;i<this.selectedOptions.length;i++) selected.push(this.selectedOptions[i].value);
+    if(selected.indexOf('__all__')>=0 && selected.length>1) {
+        if(this._prevAll) { allOpt.selected = false; }
+        else { for(var i=1;i<opts.length;i++) opts[i].selected=false; }
+    }
+    this._prevAll = allOpt.selected;
+    if(this.selectedOptions.length===0) allOpt.selected = true;
+    renderTable();
+});
+document.getElementById('filterTaskList')._prevAll = true;
+
+['filterSubmission','filterDays','filterCompleted','filterStaff','filterOffice'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', renderTable);
+});
+
+// ===== TABS =====
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
+    var tabs = {overview:0, tasks:1, followup:2, urgent:3, completed:4, activity:5};
+    var tabEls = {overview:'tabOverview', tasks:'tabTasks', followup:'tabFollowup', urgent:'tabUrgent', completed:'tabCompleted', activity:'tabActivity'};
+    document.getElementById(tabEls[tab]).classList.add('active');
+    document.querySelectorAll('.tab-btn')[tabs[tab]].classList.add('active');
+    if(tab==='overview') renderOverview();
+    if(tab==='followup') renderFollowup();
+    if(tab==='urgent') renderUrgent();
+    if(tab==='completed') renderCompleted();
+    if(tab==='activity') { buildPerfSummary(); buildTeamCards(); buildLeaderboard(); updateActivityStaffFilter(); updateActivityDateFilter(); renderDailyBreakdown(); renderActivity(); }
+}
+
+// ===== FOLLOW-UP TAB =====
+// ===== OVERVIEW =====
+var OV_OFFICES = ['Stamford','Danbury','Bridgeport','Norwalk','Hartford','New Haven','Waterbury','Greenwich','Milford','Shelton'];
+var OV_COLORS = ['#0077B6','#FF6B6B','#00D2A0','#FF9F43','#A855F7','#023E8A','#00B4D8','#e05555','#00a87e','#cc7e2e'];
+
+function parseDate(ds) {
+    if(!ds) return null;
+    var p = ds.split('-');
+    if(p.length===3) {
+        if(p[0].length===4) return new Date(p[0],p[1]-1,p[2]);
+        return new Date(p[2],p[0]-1,p[1]);
+    }
+    return null;
+}
+
+function getOffice(t) {
+    return (t['Home Office']||'').trim() || 'Not Specified';
+}
+
+function getFilteredOverviewData() {
+    var from = document.getElementById('ovFromDate').value;
+    var to = document.getElementById('ovToDate').value;
+    var type = document.getElementById('ovType').value;
+    var office = document.getElementById('ovOffice').value;
+    var fromD = from ? new Date(from) : null;
+    var toD = to ? new Date(to+'T23:59:59') : null;
+
+    return taskData.filter(function(t) {
+        var d = parseDate(t['Date Created']);
+        if(fromD && d && d < fromD) return false;
+        if(toD && d && d > toD) return false;
+        if(type && t['Task List'] !== type) return false;
+        if(office && getOffice(t) !== office) return false;
+        return true;
+    });
+}
+
+function renderOverview() {
+    var data = getFilteredOverviewData();
+
+    // Populate office filter
+    var officeSet = new Set();
+    taskData.forEach(function(t){ officeSet.add(getOffice(t)); });
+    var offSel = document.getElementById('ovOffice');
+    var curOff = offSel.value;
+    offSel.innerHTML = '<option value="">All Offices</option>';
+    [...officeSet].sort().forEach(function(o){ offSel.innerHTML += '<option value="'+o+'">'+o+'</option>'; });
+    offSel.value = curOff;
+
+    // Summary cards
+    var totalTasks = data.length;
+    var types = {}, offices = {}, insurances = {}, statuses2 = {};
+    data.forEach(function(t) {
+        var tl = t['Task List']||'Unknown';
+        types[tl] = (types[tl]||0) + 1;
+        var off = getOffice(t);
+        offices[off] = (offices[off]||0) + 1;
+        var ins = t['Insurance Plan']||'Unknown';
+        insurances[ins] = (insurances[ins]||0) + 1;
+        var s = t['Status']||'Unknown';
+        statuses2[s] = (statuses2[s]||0) + 1;
+    });
+
+    var typeKeys = Object.keys(types);
+    var topType = typeKeys.length ? typeKeys.sort(function(a,b){return types[b]-types[a]})[0] : 'N/A';
+    var topTypeShort = topType.replace('CT Pre-D ','');
+    var offKeys = Object.keys(offices);
+    var topOff = offKeys.length ? offKeys.sort(function(a,b){return offices[b]-offices[a]})[0] : 'N/A';
+
+    var newCount = statuses2['New']||0;
+    var doneCount = statuses2['Done']||0;
+    var viewedCount = statuses2['Viewed']||0;
+
+    document.getElementById('ovSummary').innerHTML =
+        '<div class="p-card"><div class="p-val" style="color:#023E8A">'+totalTasks+'</div><div class="p-label">Total Pre-Ds</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#0077B6">'+typeKeys.length+'</div><div class="p-label">Pre-D Types</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#00D2A0">'+topTypeShort+'</div><div class="p-label">Most Common Type</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#FF9F43">'+topOff+'</div><div class="p-label">Top Office</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#dbeafe;font-size:20px"><span style="color:#1e40af">'+newCount+'</span> New <span style="color:#92400e">'+viewedCount+'</span> Viewed <span style="color:#065f46">'+doneCount+'</span> Done</div><div class="p-label">OD Status Breakdown</div></div>';
+
+    // Type chart (horizontal bars)
+    var typeSorted = Object.entries(types).sort(function(a,b){return b[1]-a[1]});
+    var maxType = typeSorted.length ? typeSorted[0][1] : 1;
+    var typeHtml = '<h3>Pre-Ds by Type</h3>';
+    typeSorted.forEach(function(e,i) {
+        var pct = (e[1]/maxType*100).toFixed(1);
+        var label = e[0].replace('CT Pre-D ','');
+        typeHtml += '<div class="ov-bar-row"><div class="ov-bar-label">'+label+'</div><div class="ov-bar-track"><div class="ov-bar-fill" style="width:'+pct+'%;background:'+OV_COLORS[i%OV_COLORS.length]+'"><span>'+e[1]+'</span></div></div><div class="ov-bar-value">'+Math.round(e[1]/totalTasks*100)+'%</div></div>';
+    });
+    document.getElementById('ovTypeChart').innerHTML = typeHtml;
+
+    // Office chart
+    var offSorted = Object.entries(offices).sort(function(a,b){return b[1]-a[1]});
+    var maxOff = offSorted.length ? offSorted[0][1] : 1;
+    var offHtml = '<h3>Pre-Ds by Office</h3>';
+    offSorted.forEach(function(e,i) {
+        var pct = (e[1]/maxOff*100).toFixed(1);
+        offHtml += '<div class="ov-bar-row"><div class="ov-bar-label">'+e[0]+'</div><div class="ov-bar-track"><div class="ov-bar-fill" style="width:'+pct+'%;background:'+OV_COLORS[(i+2)%OV_COLORS.length]+'"><span>'+e[1]+'</span></div></div><div class="ov-bar-value">'+Math.round(e[1]/totalTasks*100)+'%</div></div>';
+    });
+    document.getElementById('ovOfficeChart').innerHTML = offHtml;
+
+    // Insurance chart
+    var insSorted = Object.entries(insurances).sort(function(a,b){return b[1]-a[1]}).slice(0,10);
+    var maxIns = insSorted.length ? insSorted[0][1] : 1;
+    var insHtml = '<h3>Pre-Ds by Insurance</h3>';
+    insSorted.forEach(function(e,i) {
+        var pct = (e[1]/maxIns*100).toFixed(1);
+        insHtml += '<div class="ov-bar-row"><div class="ov-bar-label">'+e[0]+'</div><div class="ov-bar-track"><div class="ov-bar-fill" style="width:'+pct+'%;background:'+OV_COLORS[(i+4)%OV_COLORS.length]+'"><span>'+e[1]+'</span></div></div><div class="ov-bar-value">'+e[1]+'</div></div>';
+    });
+    document.getElementById('ovInsChart').innerHTML = insHtml;
+
+    // Status donut
+    var statusColors = {New:'#3b82f6', Viewed:'#f59e0b', Done:'#10b981'};
+    var statusHtml = '<h3>OD Task Status</h3><div class="ov-donut-row">';
+    // SVG donut
+    var radius = 110, circ = 2 * Math.PI * radius;
+    var svgParts = '', offset = 0;
+    var statusEntries = Object.entries(statuses2).sort(function(a,b){return b[1]-a[1]});
+    statusEntries.forEach(function(e) {
+        var pct = totalTasks > 0 ? e[1]/totalTasks : 0;
+        var dash = pct * circ;
+        var color = statusColors[e[0]] || '#94a3b8';
+        svgParts += '<circle cx="140" cy="140" r="'+radius+'" fill="none" stroke="'+color+'" stroke-width="20" stroke-dasharray="'+dash+' '+(circ-dash)+'" stroke-dashoffset="-'+offset+'" />';
+        offset += dash;
+    });
+    statusHtml += '<div class="ov-donut"><svg width="280" height="280">'+svgParts+'</svg><div class="ov-donut-center"><div class="big">'+totalTasks+'</div><div class="small">Total</div></div></div>';
+    statusHtml += '<div class="ov-legend">';
+    statusEntries.forEach(function(e) {
+        var color = statusColors[e[0]] || '#94a3b8';
+        var pct = totalTasks > 0 ? Math.round(e[1]/totalTasks*100) : 0;
+        statusHtml += '<div class="ov-legend-item"><div class="ov-legend-dot" style="background:'+color+'"></div>'+e[0]+': <strong>'+e[1]+'</strong> ('+pct+'%)</div>';
+    });
+    statusHtml += '</div></div>';
+    document.getElementById('ovStatusChart').innerHTML = statusHtml;
+
+    // Monthly trend
+    var months = {};
+    data.forEach(function(t) {
+        var d = parseDate(t['Date Created']);
+        if(!d) return;
+        var mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+        months[mk] = (months[mk]||0) + 1;
+    });
+    var monthKeys = Object.keys(months).sort();
+    var maxMonth = Math.max.apply(null, monthKeys.map(function(k){return months[k]})) || 1;
+    var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var trendHtml = '<h3>Monthly Trend</h3>';
+    trendHtml += '<div class="ov-trend-row">';
+    monthKeys.forEach(function(k,i) {
+        var h = Math.max((months[k]/maxMonth*160),8);
+        var color = OV_COLORS[i%OV_COLORS.length];
+        trendHtml += '<div class="ov-trend-bar" style="height:'+h+'px;background:linear-gradient(180deg,'+color+','+color+'88)"><div class="ov-trend-val">'+months[k]+'</div></div>';
+    });
+    trendHtml += '</div><div class="ov-trend-labels">';
+    monthKeys.forEach(function(k) {
+        var parts = k.split('-');
+        trendHtml += '<span>'+monthNames[parseInt(parts[1])]+' '+parts[0].slice(2)+'</span>';
+    });
+    trendHtml += '</div>';
+    document.getElementById('ovTrendChart').innerHTML = trendHtml;
+}
+
+function renderFollowupTable(minDays, maxDays, bodyId) {
+    var html = '';
+    var row = 0;
+    var items = [];
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        var days = getDaysWaiting(st);
+        if(days >= minDays && (maxDays < 0 || days <= maxDays) && st.completed !== 'Yes') {
+            items.push({t:t, key:key, st:st, days:days});
+        }
+    });
+    items.sort(function(a,b){ return b.days - a.days; });
+    items.forEach(function(item) {
+        row++;
+        var t = item.t, key = item.key, st = item.st, days = item.days;
+        var rowClass = days >= 21 ? 'row-overdue' : 'row-warn';
+        html += '<tr class="'+rowClass+'">';
+        html += '<td>'+row+'</td>';
+        html += '<td style="text-align:center">'+getDaysBadge(days)+'</td>';
+        html += '<td>'+(t['Task List']||'')+'</td>';
+        html += '<td>'+(t['Task Number']||'')+'</td>';
+        html += '<td>'+(st.submission_date||'')+'</td>';
+        html += '<td>'+(t['PatNum']||'')+'</td>';
+        html += '<td>'+(t['Insurance Plan']||'')+'</td>';
+        html += '<td class="task-desc" title="'+esc(t['Task Description'])+'">'+(t['Task Description']||'')+'</td>';
+        html += '<td>'+makeStaffDropdown(key,st.staff||'')+'</td>';
+        html += '<td><input type="text" class="cell-dropdown" value="'+esc(st.followup_remarks||'')+'" placeholder="Add follow-up remark..." onchange="saveFollowupRemark(\''+key+'\',this.value)" style="min-width:180px"></td>';
+        html += '<td style="text-align:center;font-weight:600;font-size:12px">'+(st.last_followup_date||'--')+'</td>';
+        html += '<td>'+makeDropdown(key,'completed',['Yes','No'],st.completed||'')+'</td>';
+        html += '</tr>';
+    });
+    if(!row) html = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#999">No tasks in this range</td></tr>';
+    document.getElementById(bodyId).innerHTML = html;
+    return items.length;
+}
+
+function renderFollowup() {
+    var count = renderFollowupTable(10, 21, 'followupBody');
+    document.getElementById('followupBadge').textContent = count;
+}
+
+function renderUrgent() {
+    var count = renderFollowupTable(22, -1, 'urgentBody');
+    document.getElementById('urgentBadge').textContent = count;
+}
+
+function renderCompleted() {
+    var html = '';
+    var row = 0;
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        if(st.completed !== 'Yes') return;
+        row++;
+        html += '<tr class="completed-row">';
+        html += '<td>'+row+'</td>';
+        html += '<td>'+(t['Task List']||'')+'</td>';
+        html += '<td>'+(t['Task Number']||'')+'</td>';
+        html += '<td>'+(t['Date Created']||'')+'</td>';
+        html += '<td>'+(t['PatNum']||'')+'</td>';
+        html += '<td>'+(t['Home Office']||'')+'</td>';
+        html += '<td>'+(t['Insurance Plan']||'')+'</td>';
+        html += '<td class="task-desc" title="'+esc(t['Task Description'])+'">'+(t['Task Description']||'')+'</td>';
+        html += '<td>'+(st.staff||'')+'</td>';
+        html += '<td>'+(st.remarks||'')+'</td>';
+        html += '</tr>';
+    });
+    if(!row) html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#999">No completed tasks yet</td></tr>';
+    document.getElementById('completedBody').innerHTML = html;
+    document.getElementById('completedBadge').textContent = row;
+}
+
+function updateTabBadges() {
+    var fu = 0, urg = 0, comp = 0;
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        if(st.completed === 'Yes') { comp++; return; }
+        var days = getDaysWaiting(st);
+        if(days >= 10 && days <= 21) fu++;
+        if(days >= 22) urg++;
+    });
+    document.getElementById('followupBadge').textContent = fu;
+    document.getElementById('urgentBadge').textContent = urg;
+    document.getElementById('completedBadge').textContent = comp;
+}
+
+// ===== ACTIVITY LOG =====
+var ACTIVITY_PATH = 'ct_pred_activity';
+var activityData = [];
+
+function logActivity(key, field, value) {
+    var t = taskData.find(function(r){ return getKey(r) === key; });
+    var st = statuses[key] || {};
+    var entry = {
+        timestamp: new Date().toISOString(),
+        staff: st.staff || 'Unassigned',
+        taskNum: t ? t['Task Number'] : key,
+        patientName: t ? t['Patient Name'] : '',
+        field: field,
+        value: value
+    };
+    db.ref(ACTIVITY_PATH).push(entry);
+}
+
+function loadActivity() {
+    db.ref(ACTIVITY_PATH).orderByChild('timestamp').limitToLast(500).on('value', function(snap) {
+        activityData = [];
+        snap.forEach(function(child) {
+            activityData.push(child.val());
+        });
+        activityData.reverse();
+        renderActivity();
+    });
+}
+
+function updateActivityStaffFilter() {
+    var sel = document.getElementById('activityStaffFilter');
+    var cur = sel.value;
+    var names = new Set();
+    activityData.forEach(function(a){ if(a.staff && a.staff !== 'Unassigned') names.add(a.staff); });
+    sel.innerHTML = '<option value="">All Staff</option>';
+    [...names].sort().forEach(function(s){ sel.innerHTML += '<option value="'+s+'">'+s+'</option>'; });
+    sel.value = cur;
+}
+
+function updateActivityDateFilter() {
+    var sel = document.getElementById('activityDateFilter');
+    var cur = sel.value;
+    var dates = new Set();
+    activityData.forEach(function(a){ if(a.timestamp) dates.add(a.timestamp.split('T')[0]); });
+    var sorted = [...dates].sort().reverse();
+    sel.innerHTML = '<option value="">All Dates</option>';
+    sorted.forEach(function(d){ sel.innerHTML += '<option value="'+d+'">'+d+'</option>'; });
+    sel.value = cur;
+}
+
+function getStaffMetrics() {
+    var members = {};
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        var staff = (st.staff || '').trim();
+        if(!staff) return;
+        if(!members[staff]) members[staff] = {name:staff, assigned:0, submitted:0, followups:0, completed:0, dates:{}};
+        members[staff].assigned++;
+        if(st.submission === 'Yes') members[staff].submitted++;
+        if(st.followup && st.followup !== '') members[staff].followups++;
+        if(st.completed === 'Yes') members[staff].completed++;
+    });
+    // Enrich with activity dates
+    activityData.forEach(function(a) {
+        var staff = (a.staff || '').trim();
+        if(!staff || staff === 'Unassigned') return;
+        if(!members[staff]) members[staff] = {name:staff, assigned:0, submitted:0, followups:0, completed:0, dates:{}};
+        var date = a.timestamp ? a.timestamp.split('T')[0] : '';
+        if(date) {
+            if(!members[staff].dates[date]) members[staff].dates[date] = {submissions:0, followups:0, completions:0, actions:0};
+            members[staff].dates[date].actions++;
+            if(a.field === 'submission' && a.value === 'Yes') members[staff].dates[date].submissions++;
+            if(a.field === 'followup') members[staff].dates[date].followups++;
+            if(a.field === 'completed' && a.value === 'Yes') members[staff].dates[date].completions++;
+        }
+    });
+    return members;
+}
+
+function buildPerfSummary() {
+    var members = getStaffMetrics();
+    var memberList = Object.values(members);
+    var totalAssigned = memberList.reduce(function(s,m){return s+m.assigned},0);
+    var totalSubmitted = memberList.reduce(function(s,m){return s+m.submitted},0);
+    var totalFollowups = memberList.reduce(function(s,m){return s+m.followups},0);
+    var totalCompleted = memberList.reduce(function(s,m){return s+m.completed},0);
+    var totalDays = new Set();
+    memberList.forEach(function(m){ Object.keys(m.dates).forEach(function(d){ totalDays.add(d); }); });
+    var daysActive = totalDays.size || 0;
+    var completionRate = totalAssigned > 0 ? Math.round(totalCompleted / totalAssigned * 100) : 0;
+
+    document.getElementById('perfSummary').innerHTML =
+        '<div class="p-card"><div class="p-val" style="color:#023E8A">'+memberList.length+'</div><div class="p-label">Team Members</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#0077B6">'+totalAssigned+'</div><div class="p-label">Tasks Assigned</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#00D2A0">'+totalSubmitted+'</div><div class="p-label">Pre-Ds Submitted</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#A855F7">'+totalFollowups+'</div><div class="p-label">Follow-Ups Done</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#00B4D8">'+totalCompleted+'</div><div class="p-label">Tasks Completed</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:'+(completionRate>=70?'#00D2A0':completionRate>=40?'#FF9F43':'#FF6B6B')+'">'+completionRate+'%</div><div class="p-label">Completion Rate</div></div>'+
+        '<div class="p-card"><div class="p-val" style="color:#023E8A">'+daysActive+'</div><div class="p-label">Active Days</div></div>';
+}
+
+function buildTeamCards() {
+    var members = getStaffMetrics();
+    var sorted = Object.values(members).sort(function(a,b){ return (b.submitted+b.followups+b.completed) - (a.submitted+a.followups+a.completed); });
+    var maxWork = sorted.length ? Math.max.apply(null, sorted.map(function(m){ return m.submitted+m.followups+m.completed; })) : 1;
+
+    var html = '';
+    sorted.forEach(function(m) {
+        var totalWork = m.submitted + m.followups + m.completed;
+        var daysWorked = Object.keys(m.dates).length || 0;
+        var completionRate = m.assigned > 0 ? Math.round(m.completed / m.assigned * 100) : 0;
+        var barPct = maxWork > 0 ? (totalWork / maxWork * 100).toFixed(1) : 0;
+        var color = completionRate >= 70 ? '#00D2A0' : completionRate >= 40 ? '#0077B6' : '#FF6B6B';
+
+        html += '<div class="t-card">';
+        html += '<div class="t-card-accent" style="background:linear-gradient(90deg,'+color+','+color+'88)"></div>';
+        html += '<div class="t-card-header"><div class="t-card-name">'+m.name+'</div>';
+        html += '<span class="status-pill" style="background:'+color+'">'+completionRate+'% Done</span></div>';
+        html += '<div class="t-card-stats">';
+        html += '<div class="t-stat"><div class="t-stat-val" style="color:#0077B6">'+m.assigned+'</div><div class="t-stat-label">Assigned</div></div>';
+        html += '<div class="t-stat"><div class="t-stat-val" style="color:#00D2A0">'+m.submitted+'</div><div class="t-stat-label">Submitted</div></div>';
+        html += '<div class="t-stat"><div class="t-stat-val" style="color:#A855F7">'+m.followups+'</div><div class="t-stat-label">Follow-Ups</div></div>';
+        html += '<div class="t-stat"><div class="t-stat-val" style="color:#00B4D8">'+m.completed+'</div><div class="t-stat-label">Completed</div></div>';
+        html += '</div>';
+        html += '<div class="t-card-meta"><b>'+daysWorked+'</b> day'+(daysWorked!==1?'s':'')+' active &bull; <b>'+completionRate+'%</b> completion rate</div>';
+        html += '<div class="t-progress"><div class="t-progress-track"><div class="t-progress-fill" style="width:'+barPct+'%;background:'+color+'"></div></div></div>';
+        html += '</div>';
+    });
+    document.getElementById('teamGrid').innerHTML = html || '<div style="padding:20px;color:#94a3b8;text-align:center">No team activity yet. Assign staff to tasks to see stats.</div>';
+}
+
+function buildLeaderboard() {
+    var members = getStaffMetrics();
+    var sorted = Object.values(members).sort(function(a,b){ return (b.submitted+b.followups+b.completed) - (a.submitted+a.followups+a.completed); });
+    if(!sorted.length) { document.getElementById('leaderboardWrap').innerHTML = '<div style="padding:20px;color:#94a3b8;text-align:center">No team activity yet.</div>'; return; }
+
+    var maxWork = Math.max.apply(null, sorted.map(function(m){ return m.submitted+m.followups+m.completed; }));
+    var medals = ['&#129351;','&#129352;','&#129353;'];
+
+    var rows = '<div class="lb-row lb-header"><div>Rank</div><div>Team Member</div><div>Total Work</div><div>Breakdown</div><div>Done %</div></div>';
+    sorted.forEach(function(m, i) {
+        var totalWork = m.submitted + m.followups + m.completed;
+        var completionRate = m.assigned > 0 ? Math.round(m.completed / m.assigned * 100) : 0;
+        var fillPct = maxWork > 0 ? (totalWork / maxWork * 100).toFixed(1) : 0;
+        var color = completionRate >= 70 ? '#00D2A0' : completionRate >= 40 ? '#0077B6' : '#FF6B6B';
+        var rankHtml = i < 3 ? '<span class="lb-medal">'+medals[i]+'</span>' : '<span class="lb-rank">#'+(i+1)+'</span>';
+
+        rows += '<div class="lb-row">';
+        rows += '<div style="text-align:center">'+rankHtml+'</div>';
+        rows += '<div><div class="lb-name">'+m.name+'</div><div class="lb-name-sub">'+m.assigned+' assigned | '+Object.keys(m.dates).length+' days</div></div>';
+        rows += '<div style="text-align:center"><div class="lb-stat-val" style="color:'+color+'">'+totalWork+'</div></div>';
+        rows += '<div><div class="lb-bar-track"><div class="lb-bar-fill" style="width:'+fillPct+'%;background:linear-gradient(90deg,'+color+','+color+'cc)"><span>'+m.submitted+'S / '+m.followups+'F / '+m.completed+'C</span></div></div></div>';
+        rows += '<div style="text-align:center"><span class="status-pill" style="background:'+color+'">'+completionRate+'%</span></div>';
+        rows += '</div>';
+    });
+    document.getElementById('leaderboardWrap').innerHTML = '<div class="lb-wrapper">'+rows+'</div>';
+}
+
+function renderDailyBreakdown() {
+    var filterStaff = document.getElementById('activityStaffFilter').value;
+    var filterDate = document.getElementById('activityDateFilter').value;
+    var dailyData = {};
+
+    activityData.forEach(function(a) {
+        var staff = (a.staff || '').trim();
+        if(!staff || staff === 'Unassigned') return;
+        var date = a.timestamp ? a.timestamp.split('T')[0] : '';
+        if(!date) return;
+        if(filterStaff && staff !== filterStaff) return;
+        if(filterDate && date !== filterDate) return;
+        var k = date + '|' + staff;
+        if(!dailyData[k]) dailyData[k] = {date:date, staff:staff, submissions:0, followups:0, completions:0, actions:0};
+        dailyData[k].actions++;
+        if(a.field === 'submission' && a.value === 'Yes') dailyData[k].submissions++;
+        if(a.field === 'followup') dailyData[k].followups++;
+        if(a.field === 'completed' && a.value === 'Yes') dailyData[k].completions++;
+    });
+
+    var rows = Object.values(dailyData).sort(function(a,b) {
+        if(a.date > b.date) return -1; if(a.date < b.date) return 1;
+        return a.staff.localeCompare(b.staff);
+    });
+
+    var html = '';
+    rows.forEach(function(r) {
+        var total = r.submissions + r.followups + r.completions;
+        var compRate = total > 0 ? Math.round(r.completions / total * 100) : 0;
+        var color = compRate >= 70 ? '#00D2A0' : compRate >= 40 ? '#FF9F43' : '#FF6B6B';
+        html += '<tr>';
+        html += '<td style="font-weight:600">'+r.date+'</td>';
+        html += '<td style="font-weight:700;color:#023E8A">'+r.staff+'</td>';
+        html += '<td style="font-weight:700;color:#00D2A0">'+r.submissions+'</td>';
+        html += '<td style="font-weight:700;color:#A855F7">'+r.followups+'</td>';
+        html += '<td style="font-weight:700;color:#00B4D8">'+r.completions+'</td>';
+        html += '<td><span style="color:'+color+';font-weight:700">'+compRate+'%</span></td>';
+        html += '<td style="font-weight:600">'+r.actions+'</td>';
+        html += '</tr>';
+    });
+    if(!html) html = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8">No daily activity yet. Data appears as staff work tasks.</td></tr>';
+    document.getElementById('dailyBody').innerHTML = html;
+}
+
+function renderActivity() {
+    var filterStaff = document.getElementById('activityStaffFilter').value;
+    var filterDate = document.getElementById('activityDateFilter').value;
+    var html = '';
+    var row = 0;
+    var fieldLabels = {submission:'Pre-D Submission',staff:'Assigned Staff',updated_od:'Updated in OD',completed:'Task Completed',remarks:'Remarks',followup_remarks:'Follow-Up Remarks'};
+    activityData.forEach(function(a) {
+        if(filterStaff && a.staff !== filterStaff) return;
+        if(filterDate && !a.timestamp.startsWith(filterDate)) return;
+        row++;
+        var dt = new Date(a.timestamp);
+        var dateStr = (dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear()+' '+dt.toLocaleTimeString();
+        html += '<tr>';
+        html += '<td>'+row+'</td>';
+        html += '<td>'+dateStr+'</td>';
+        html += '<td><strong>'+(a.staff||'')+'</strong></td>';
+        html += '<td>'+(a.taskNum||'')+'</td>';
+        html += '<td>'+(fieldLabels[a.field]||a.field)+'</td>';
+        html += '<td>'+(a.value||'')+'</td>';
+        html += '</tr>';
+    });
+    if(!row) html = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#999">No activity logged yet</td></tr>';
+    document.getElementById('activityBody').innerHTML = html;
+}
+</script>
+</body>
+</html>
