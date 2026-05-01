@@ -45,7 +45,7 @@ tr.row-overdue:hover{background:#fee2e2}
 .btn-export:hover{background:#00b88d}
 .btn-reset{background:#FF6B6B;color:#fff}
 .btn-reset:hover{background:#e55a5a}
-.table-container{padding:0 30px 30px;overflow-x:auto}
+.table-container{padding:0 30px 30px;overflow-x:auto;max-height:75vh;overflow-y:auto}
 table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:13px}
 thead th{background:#023E8A;color:#fff;padding:12px 10px;text-align:left;font-weight:600;font-size:12px;position:sticky;top:0;z-index:10;white-space:nowrap}
 tbody td{padding:10px;border-bottom:1px solid #eee;vertical-align:top}
@@ -251,7 +251,7 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 </select></div>
 <div class="filter-group"><label>Task Completed</label>
 <select id="filterCompleted">
-<option value="">All</option><option value="Yes">Yes</option><option value="No">No</option>
+<option value="__exclude__">Exclude Completed</option><option value="">All</option><option value="Yes">Yes Only</option><option value="No">No Only</option>
 </select></div>
 <div class="filter-group"><label>Assigned Staff</label>
 <select id="filterStaff"><option value="">All Staff</option></select></div>
@@ -581,7 +581,8 @@ function renderTable() {
         else if(filterSub && (st.submission||'')!==filterSub) return;
         if(filterDays==='overdue' && days<5) return;
         if(filterDays==='critical' && days<10) return;
-        if(filterComp && (st.completed||'')!==filterComp) return;
+        if(filterComp==='__exclude__' && st.completed==='Yes') return;
+        else if(filterComp && filterComp!=='__exclude__' && (st.completed||'')!==filterComp) return;
         if(filterStaff && (st.staff||'')!==filterStaff) return;
         if(search){
             var hay = ((t['Patient Name']||'')+' '+(t['PatNum']||'')+' '+(t['Task Description']||'')+' '+(t['Insurance Plan']||'')).toLowerCase();
