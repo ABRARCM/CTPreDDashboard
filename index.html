@@ -47,7 +47,10 @@ tr.row-overdue:hover{background:#fee2e2}
 .btn-reset:hover{background:#e55a5a}
 .table-container{padding:0 30px 30px;overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
-thead th{background:#023E8A;color:#fff;padding:12px 10px;text-align:left;font-weight:600;font-size:12px;position:sticky;top:0;z-index:10;white-space:nowrap}
+thead th{background:#023E8A;color:#fff;padding:12px 10px;text-align:left;font-weight:600;font-size:12px;position:sticky;top:0;z-index:10;white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{background:#0353a4}
+thead th .sort-arrow{margin-left:4px;font-size:10px;opacity:.6}
+thead th.sorted .sort-arrow{opacity:1}
 tbody td{padding:10px;border-bottom:1px solid #eee;vertical-align:top}
 tbody tr:hover{background:#f0f7ff}
 tbody tr.completed-row{background:#f0fdf4}
@@ -265,8 +268,16 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 
 <div class="table-container">
 <table><thead><tr>
-<th>#</th><th>Task List</th><th>Task #</th><th>Date Created</th><th>OD Status</th>
-<th>PatNum</th><th>DOB</th><th>Home Office</th><th>Insurance</th><th>Subscriber ID</th>
+<th>#</th>
+<th onclick="sortTable('Task List')">Task List<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Task Number')">Task #<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Date Created')">Date Created<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Status')">OD Status<span class="sort-arrow"></span></th>
+<th onclick="sortTable('PatNum')">PatNum<span class="sort-arrow"></span></th>
+<th onclick="sortTable('DOB')">DOB<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Home Office')">Home Office<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Insurance Plan')">Insurance<span class="sort-arrow"></span></th>
+<th onclick="sortTable('Subscriber ID')">Subscriber ID<span class="sort-arrow"></span></th>
 <th>Task Description</th>
 <th style="min-width:130px">Assigned Staff</th><th style="min-width:160px">Pre-D Submission</th><th>Submission Date</th>
 <th style="min-width:130px">Updated Task in OD</th><th>Days Waiting</th>
@@ -554,6 +565,28 @@ function getStatusBadge(s) {
 
 function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
+var currentSort = {field: '', dir: 'asc'};
+
+function sortTable(field) {
+    if(currentSort.field === field) {
+        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.field = field;
+        currentSort.dir = 'asc';
+    }
+    renderTable();
+}
+
+function parseSortDate(ds) {
+    if(!ds) return 0;
+    var p = ds.split('-');
+    if(p.length===3) {
+        if(p[0].length===4) return new Date(p[0],p[1]-1,p[2]).getTime();
+        return new Date(p[2],p[0]-1,p[1]).getTime();
+    }
+    return 0;
+}
+
 function renderTable() {
     var filterTLSel = document.getElementById('filterTaskList');
     var filterTLRaw = [];
@@ -570,6 +603,8 @@ function renderTable() {
     var html = '';
     var row = 0;
 
+    // Filter
+    var filtered = [];
     taskData.forEach(function(t) {
         var key = getKey(t);
         var st = statuses[key] || {};
@@ -585,9 +620,33 @@ function renderTable() {
         else if(filterComp && filterComp!=='__exclude__' && (st.completed||'')!==filterComp) return;
         if(filterStaff && (st.staff||'')!==filterStaff) return;
         if(search){
-            var hay = ((t['Patient Name']||'')+' '+(t['PatNum']||'')+' '+(t['Task Description']||'')+' '+(t['Insurance Plan']||'')).toLowerCase();
+            var hay = ((t['PatNum']||'')+' '+(t['Task Description']||'')+' '+(t['Insurance Plan']||'')).toLowerCase();
             if(hay.indexOf(search)<0) return;
         }
+        filtered.push(t);
+    });
+
+    // Sort
+    if(currentSort.field) {
+        var dateFields = ['Date Created','DOB'];
+        var isDate = dateFields.indexOf(currentSort.field) >= 0;
+        filtered.sort(function(a,b) {
+            var va = (a[currentSort.field]||'');
+            var vb = (b[currentSort.field]||'');
+            var result;
+            if(isDate) {
+                result = parseSortDate(va) - parseSortDate(vb);
+            } else {
+                result = va.toString().localeCompare(vb.toString(), undefined, {numeric:true});
+            }
+            return currentSort.dir === 'desc' ? -result : result;
+        });
+    }
+
+    filtered.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        var days = getDaysWaiting(st);
 
         row++;
         counts.total++;
