@@ -149,6 +149,25 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 .ov-trend-bar .ov-trend-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:#334155;white-space:nowrap}
 .ov-trend-labels{display:flex;gap:6px;padding-top:6px}
 .ov-trend-labels span{flex:1;text-align:center;font-size:10px;color:#64748b;font-weight:600}
+/* Follow-Up History Modal */
+.fu-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:2000}
+.fu-modal{background:#fff;border-radius:16px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.fu-modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:2px solid #f0f4f8}
+.fu-modal-header h3{font-size:18px;font-weight:700;color:#023E8A}
+.fu-modal-close{background:none;border:none;font-size:24px;color:#999;cursor:pointer;padding:4px 8px;border-radius:6px}
+.fu-modal-close:hover{background:#f0f4f8;color:#333}
+.fu-modal-body{flex:1;overflow-y:auto;padding:20px 24px}
+.fu-history-entry{padding:12px 16px;border-left:3px solid #0077B6;background:#f8fafc;border-radius:0 10px 10px 0;margin-bottom:10px}
+.fu-history-entry .fu-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.fu-history-entry .fu-staff{font-weight:700;color:#023E8A;font-size:14px}
+.fu-history-entry .fu-date{font-size:12px;color:#64748b;font-weight:600}
+.fu-history-entry .fu-remark{font-size:13px;color:#334155;line-height:1.5}
+.fu-history-empty{text-align:center;padding:40px;color:#999;font-size:14px}
+.fu-count-badge{display:inline-block;background:#0077B6;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px}
+.fu-view-link{color:#0077B6;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline}
+.fu-view-link:hover{color:#023E8A}
+.fu-latest{font-size:11px;color:#555;margin-top:4px;line-height:1.4}
+.fu-latest b{color:#023E8A}
 </style>
 </head>
 <body>
@@ -397,6 +416,17 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 
 </div><!-- end tabActivity -->
 
+<!-- Follow-Up History Modal -->
+<div class="fu-modal-overlay" id="fuModal" style="display:none" onclick="if(event.target===this)closeFuModal()">
+<div class="fu-modal">
+<div class="fu-modal-header">
+<h3 id="fuModalTitle">Follow-Up History</h3>
+<button class="fu-modal-close" onclick="closeFuModal()">&times;</button>
+</div>
+<div class="fu-modal-body" id="fuModalBody"></div>
+</div>
+</div>
+
 </div>
 
 <script>
@@ -525,24 +555,48 @@ function addFollowupEntry(key) {
     renderUrgent();
 }
 
-function buildFollowupHistoryHTML(st) {
+function buildFollowupHistoryHTML(st, key, taskNum) {
     var history = st.followup_history || [];
     // If no history array but legacy remark exists, show it as a single entry
     if(!history.length && st.followup_remarks) {
         history = [{ date: st.last_followup_date || '--', staff: st.staff || '--', remark: st.followup_remarks }];
     }
     if(!history.length) return '<span style="color:#999;font-size:12px">No follow-ups yet</span>';
-    var html = '<div style="max-height:120px;overflow-y:auto;font-size:12px">';
-    for(var i=history.length-1; i>=0; i--) {
-        var e = history[i];
-        html += '<div style="padding:4px 0;border-bottom:1px solid #eee">';
-        html += '<span style="font-weight:700;color:#0077B6">'+esc(e.staff||'--')+'</span>';
-        html += ' <span style="color:#999">'+esc(e.date||'')+'</span><br>';
-        html += '<span>'+esc(e.remark)+'</span>';
-        html += '</div>';
+    var latest = history[history.length - 1];
+    var html = '<div>';
+    html += '<div class="fu-latest"><b>'+esc(latest.staff||'--')+'</b> ('+esc(latest.date||'--')+')<br>'+esc(latest.remark)+'</div>';
+    if(history.length > 0) {
+        html += '<span class="fu-view-link" onclick="openFuModal(\''+key+'\',\''+esc(taskNum||'')+'\')">View History <span class="fu-count-badge">'+history.length+'</span></span>';
     }
     html += '</div>';
     return html;
+}
+
+function openFuModal(key, taskNum) {
+    var st = statuses[key] || {};
+    var history = st.followup_history || [];
+    if(!history.length && st.followup_remarks) {
+        history = [{ date: st.last_followup_date || '--', staff: st.staff || '--', remark: st.followup_remarks }];
+    }
+    document.getElementById('fuModalTitle').textContent = 'Follow-Up History — Task #' + taskNum;
+    var html = '';
+    if(!history.length) {
+        html = '<div class="fu-history-empty">No follow-up history recorded yet.</div>';
+    } else {
+        for(var i=history.length-1; i>=0; i--) {
+            var e = history[i];
+            html += '<div class="fu-history-entry">';
+            html += '<div class="fu-meta"><span class="fu-staff">'+esc(e.staff||'--')+'</span><span class="fu-date">'+esc(e.date||'')+'</span></div>';
+            html += '<div class="fu-remark">'+esc(e.remark)+'</div>';
+            html += '</div>';
+        }
+    }
+    document.getElementById('fuModalBody').innerHTML = html;
+    document.getElementById('fuModal').style.display = 'flex';
+}
+
+function closeFuModal() {
+    document.getElementById('fuModal').style.display = 'none';
 }
 
 function buildNewFollowupInput(key) {
@@ -1080,7 +1134,7 @@ function renderFollowupTable(minDays, maxDays, bodyId, filterId) {
         html += '<td>'+(t['Insurance Plan']||'')+'</td>';
         html += '<td class="task-desc" title="'+esc(t['Task Description'])+'">'+(t['Task Description']||'')+'</td>';
         html += '<td>'+makeStaffDropdown(key,st.staff||'')+'</td>';
-        html += '<td>'+buildFollowupHistoryHTML(st)+'</td>';
+        html += '<td>'+buildFollowupHistoryHTML(st, key, t['Task Number'])+'</td>';
         html += '<td>'+buildNewFollowupInput(key)+'</td>';
         html += '<td>'+makeDropdown(key,'completed',['Yes','No'],st.completed||'')+'</td>';
         html += '</tr>';
