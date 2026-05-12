@@ -294,11 +294,22 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 <h2 style="color:#FF9F43;margin-bottom:10px">Follow-Up Queue (10-21 Days)</h2>
 <p style="color:#666;font-size:14px;margin-bottom:15px">Tasks submitted 10-21 days ago without completion. Follow up with the state on these.</p>
 </div>
+<div class="controls" style="padding-top:0">
+<div class="filter-group">
+<label>Task List (Cmd+click for multiple)</label>
+<select id="filterTaskListFollowup" multiple size="5" style="min-width:180px">
+<option value="__all__" selected>All Task Lists</option>
+<option value="CT Pre-D Ortho">CT Pre-D Ortho</option>
+<option value="CT Pre-D Pedo/GP">CT Pre-D Pedo/GP</option>
+<option value="CT Pre-D Endo">CT Pre-D Endo</option>
+<option value="CT Pre-D 3MRC/Nitrous">CT Pre-D 3MRC/Nitrous</option>
+</select></div>
+</div>
 <div class="table-container">
 <table><thead><tr>
 <th>#</th><th>Days</th><th>Task List</th><th>Task #</th><th>Submitted</th>
 <th>PatNum</th><th>Insurance</th><th>Task Description</th>
-<th>Assigned Staff</th><th style="min-width:200px">Follow-Up Remarks</th><th>Last Follow-Up</th><th style="min-width:130px">Task Completed</th>
+<th>Assigned Staff</th><th style="min-width:280px">Follow-Up History</th><th style="min-width:220px">New Follow-Up</th><th style="min-width:130px">Task Completed</th>
 </tr></thead><tbody id="followupBody"></tbody></table>
 </div>
 </div><!-- end tabFollowup -->
@@ -309,11 +320,22 @@ select.cell-dropdown.val-final{background:#d1fae5;border-color:#00D2A0}
 <h2 style="color:#991b1b;margin-bottom:10px">Urgent (21+ Days)</h2>
 <p style="color:#666;font-size:14px;margin-bottom:15px">Tasks submitted over 21 days ago. These require immediate attention and escalation.</p>
 </div>
+<div class="controls" style="padding-top:0">
+<div class="filter-group">
+<label>Task List (Cmd+click for multiple)</label>
+<select id="filterTaskListUrgent" multiple size="5" style="min-width:180px">
+<option value="__all__" selected>All Task Lists</option>
+<option value="CT Pre-D Ortho">CT Pre-D Ortho</option>
+<option value="CT Pre-D Pedo/GP">CT Pre-D Pedo/GP</option>
+<option value="CT Pre-D Endo">CT Pre-D Endo</option>
+<option value="CT Pre-D 3MRC/Nitrous">CT Pre-D 3MRC/Nitrous</option>
+</select></div>
+</div>
 <div class="table-container">
 <table><thead><tr>
 <th>#</th><th>Days</th><th>Task List</th><th>Task #</th><th>Submitted</th>
 <th>PatNum</th><th>Insurance</th><th>Task Description</th>
-<th>Assigned Staff</th><th style="min-width:200px">Follow-Up Remarks</th><th>Last Follow-Up</th><th style="min-width:130px">Task Completed</th>
+<th>Assigned Staff</th><th style="min-width:280px">Follow-Up History</th><th style="min-width:220px">New Follow-Up</th><th style="min-width:130px">Task Completed</th>
 </tr></thead><tbody id="urgentBody"></tbody></table>
 </div>
 </div><!-- end tabUrgent -->
@@ -474,6 +496,89 @@ function saveFollowupRemark(key, value) {
     db.ref(STATUSES_PATH+'/'+key+'/followup_remarks').set(value);
     db.ref(STATUSES_PATH+'/'+key+'/last_followup_date').set(dateStr);
     logActivity(key, 'followup_remarks', value);
+}
+
+function addFollowupEntry(key) {
+    var remarkInput = document.getElementById('fu_remark_'+key);
+    var staffSelect = document.getElementById('fu_staff_'+key);
+    var remark = (remarkInput ? remarkInput.value : '').trim();
+    var staff = staffSelect ? staffSelect.value : '';
+    if(!remark) { alert('Please enter a follow-up remark.'); return; }
+    if(!staff) { alert('Please select a staff member.'); return; }
+    if(!statuses[key]) statuses[key] = {};
+    var today = new Date();
+    var dateStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
+    // Build history array
+    if(!statuses[key].followup_history) statuses[key].followup_history = [];
+    var entry = { date: dateStr, staff: staff, remark: remark };
+    statuses[key].followup_history.push(entry);
+    // Also update legacy fields for compatibility
+    statuses[key].followup_remarks = remark;
+    statuses[key].last_followup_date = dateStr;
+    // Save to Firebase
+    db.ref(STATUSES_PATH+'/'+key+'/followup_history').set(statuses[key].followup_history);
+    db.ref(STATUSES_PATH+'/'+key+'/followup_remarks').set(remark);
+    db.ref(STATUSES_PATH+'/'+key+'/last_followup_date').set(dateStr);
+    logActivity(key, 'followup_remarks', staff + ': ' + remark);
+    // Re-render
+    renderFollowup();
+    renderUrgent();
+}
+
+function buildFollowupHistoryHTML(st) {
+    var history = st.followup_history || [];
+    // If no history array but legacy remark exists, show it as a single entry
+    if(!history.length && st.followup_remarks) {
+        history = [{ date: st.last_followup_date || '--', staff: st.staff || '--', remark: st.followup_remarks }];
+    }
+    if(!history.length) return '<span style="color:#999;font-size:12px">No follow-ups yet</span>';
+    var html = '<div style="max-height:120px;overflow-y:auto;font-size:12px">';
+    for(var i=history.length-1; i>=0; i--) {
+        var e = history[i];
+        html += '<div style="padding:4px 0;border-bottom:1px solid #eee">';
+        html += '<span style="font-weight:700;color:#0077B6">'+esc(e.staff||'--')+'</span>';
+        html += ' <span style="color:#999">'+esc(e.date||'')+'</span><br>';
+        html += '<span>'+esc(e.remark)+'</span>';
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function buildNewFollowupInput(key) {
+    var html = '<div style="display:flex;flex-direction:column;gap:4px">';
+    html += '<select id="fu_staff_'+key+'" class="cell-dropdown" style="font-size:11px">';
+    html += '<option value="">Staff...</option>';
+    var staffOpts = getStaffOptions();
+    for(var i=0;i<staffOpts.length;i++) {
+        html += '<option value="'+esc(staffOpts[i])+'">'+esc(staffOpts[i])+'</option>';
+    }
+    html += '</select>';
+    html += '<input type="text" id="fu_remark_'+key+'" class="cell-dropdown" placeholder="Enter remark..." style="font-size:11px;min-width:160px" onkeypress="if(event.key===\'Enter\')addFollowupEntry(\''+key+'\')">';
+    html += '<button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="addFollowupEntry(\''+key+'\')">Add</button>';
+    html += '</div>';
+    return html;
+}
+
+function getStaffOptions() {
+    var staffSet = {};
+    taskData.forEach(function(t) {
+        var key = getKey(t);
+        var st = statuses[key] || {};
+        if(st.staff) staffSet[st.staff] = true;
+    });
+    var defaults = ['MB','MA','JO'];
+    defaults.forEach(function(s){ staffSet[s]=true; });
+    return Object.keys(staffSet).sort();
+}
+
+function getSelectedTaskLists(filterId) {
+    var sel = document.getElementById(filterId);
+    if(!sel) return null;
+    var selected = [];
+    for(var i=0;i<sel.selectedOptions.length;i++) selected.push(sel.selectedOptions[i].value);
+    if(selected.indexOf('__all__')>=0) return null;
+    return selected;
 }
 
 function getDaysWaiting(st) {
@@ -749,6 +854,26 @@ document.getElementById('filterTaskList')._prevAll = true;
     document.getElementById(id).addEventListener('change', renderTable);
 });
 
+// Follow-up / Urgent tab task list filters
+['filterTaskListFollowup','filterTaskListUrgent'].forEach(function(filterId) {
+    var el = document.getElementById(filterId);
+    el.addEventListener('change', function() {
+        var opts = this.options;
+        var allOpt = opts[0];
+        var selected = [];
+        for(var i=0;i<this.selectedOptions.length;i++) selected.push(this.selectedOptions[i].value);
+        if(selected.indexOf('__all__')>=0 && selected.length>1) {
+            if(this._prevAll) { allOpt.selected = false; }
+            else { for(var i=1;i<opts.length;i++) opts[i].selected=false; }
+        }
+        this._prevAll = allOpt.selected;
+        if(this.selectedOptions.length===0) allOpt.selected = true;
+        renderFollowup();
+        renderUrgent();
+    });
+    el._prevAll = true;
+});
+
 // ===== TABS =====
 function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
@@ -926,15 +1051,17 @@ function renderOverview() {
     document.getElementById('ovTrendChart').innerHTML = trendHtml;
 }
 
-function renderFollowupTable(minDays, maxDays, bodyId) {
+function renderFollowupTable(minDays, maxDays, bodyId, filterId) {
     var html = '';
     var row = 0;
     var items = [];
+    var allowedLists = getSelectedTaskLists(filterId);
     taskData.forEach(function(t) {
         var key = getKey(t);
         var st = statuses[key] || {};
         var days = getDaysWaiting(st);
         if(days >= minDays && (maxDays < 0 || days <= maxDays) && st.completed !== 'Yes') {
+            if(allowedLists && allowedLists.indexOf(t['Task List'])===-1) return;
             items.push({t:t, key:key, st:st, days:days});
         }
     });
@@ -953,8 +1080,8 @@ function renderFollowupTable(minDays, maxDays, bodyId) {
         html += '<td>'+(t['Insurance Plan']||'')+'</td>';
         html += '<td class="task-desc" title="'+esc(t['Task Description'])+'">'+(t['Task Description']||'')+'</td>';
         html += '<td>'+makeStaffDropdown(key,st.staff||'')+'</td>';
-        html += '<td><input type="text" class="cell-dropdown" value="'+esc(st.followup_remarks||'')+'" placeholder="Add follow-up remark..." onchange="saveFollowupRemark(\''+key+'\',this.value)" style="min-width:180px"></td>';
-        html += '<td style="text-align:center;font-weight:600;font-size:12px">'+(st.last_followup_date||'--')+'</td>';
+        html += '<td>'+buildFollowupHistoryHTML(st)+'</td>';
+        html += '<td>'+buildNewFollowupInput(key)+'</td>';
         html += '<td>'+makeDropdown(key,'completed',['Yes','No'],st.completed||'')+'</td>';
         html += '</tr>';
     });
@@ -964,12 +1091,12 @@ function renderFollowupTable(minDays, maxDays, bodyId) {
 }
 
 function renderFollowup() {
-    var count = renderFollowupTable(10, 21, 'followupBody');
+    var count = renderFollowupTable(10, 21, 'followupBody', 'filterTaskListFollowup');
     document.getElementById('followupBadge').textContent = count;
 }
 
 function renderUrgent() {
-    var count = renderFollowupTable(22, -1, 'urgentBody');
+    var count = renderFollowupTable(22, -1, 'urgentBody', 'filterTaskListUrgent');
     document.getElementById('urgentBadge').textContent = count;
 }
 
